@@ -10,7 +10,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import NoteDocument from '../components/NoteDocument';
 import { DatabaseContext } from '../context/DatabaseContext';
 import { UserContext } from '../context/UserContext';
-import { supabase } from '../supabaseClient';
 import CustomPDFViewer from '../components/CustomPDFViewer';
 import { distributeTotals } from '../utils/weightDistribution';
 
@@ -885,29 +884,45 @@ const NoteForm = () => {
                   if (!aiQuery.trim()) return;
                   setAiLoading(true);
                   setAiResult({ code: '', explanation: '' });
-                  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
-                  if (!apiKey) { setAiResult({ code: '', explanation: '❌ Clé API Groq manquante' }); return; }
+                  const apiKeys = (import.meta.env.VITE_GEMINI_API_KEYS || import.meta.env.VITE_GEMINI_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean);
+                  if (!apiKeys.length) { setAiResult({ code: '', explanation: '❌ Aucune clé API configurée' }); return; }
                   const prompt = `Tu es un expert en nomenclature douanière du CEMAC/Gabon. Pour ce produit: "${aiQuery}", donne le code SH sur 8 chiffres et une brève explication (chapitre, droits typiques). Réponds avec uniquement ce JSON (sans backticks ni markdown) : {"code":"XXXXXXXX","explanation":"..."}`;
-                  fetch('https://api.groq.com/openai/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                    body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], temperature: 0.1 })
-                  })
-                  .then(async r => {
-                    if (r.status === 429) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Quota dépassé (429): ${errBody.substring(0, 100)}` }); return; }
-                    if (!r.ok) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Erreur ${r.status}: ${errBody.substring(0, 200)}` }); return; }
-                    const data = await r.json();
-                    const text = data?.choices?.[0]?.message?.content || '';
-                    supabase.from('ai_queries').insert({ company_id: user?.companyId || user?.company_id, user_id: user?.id, query: aiQuery, response: text }).then(({ error }) => { if (error) console.error('AI log error:', error); }).catch(err => console.error('AI log catch:', err));
-                    if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API' }); return; }
-                    const jsonMatch = text.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                      try { const parsed = JSON.parse(jsonMatch[0]); setAiResult({ code: parsed.code || '', explanation: parsed.explanation || text }); return; } catch { /* ignore */ }
-                    }
-                    setAiResult({ code: '', explanation: text });
-                  })
-                  .catch((err) => setAiResult({ code: '', explanation: `Erreur réseau : ${err.message}` }))
-                  .finally(() => setAiLoading(false));
+                  let lastError = '';
+                  const tryKey = (keyIndex) => {
+                    if (keyIndex >= apiKeys.length) { setAiResult({ code: '', explanation: `❌ ${lastError}` }); setAiLoading(false); return; }
+                    fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKeys[keyIndex] },
+                      body: JSON.stringify({ model: 'gemini-3.5-flash', input: prompt, generation_config: { thinking_level: 'minimal' } })
+                    })
+                    .then(async r => {
+                      if (r.status === 429) { lastError = `Quota épuisé pour la clé ${keyIndex + 1}`; tryKey(keyIndex + 1); return; }
+                      if (!r.ok) { const errBody = await r.text(); lastError = `Erreur ${r.status}: ${errBody.substring(0, 200)}`; tryKey(keyIndex + 1); return; }
+                      const data = await r.json();
+                      console.log('🔍 Réponse API Gemini brute:', JSON.stringify(data, null, 2));
+                      if (data.error) { setAiResult({ code: '', explanation: `❌ ${data.error.message}` }); setAiLoading(false); return; }
+                      let text = '';
+                      if (data?.steps?.length > 0) {
+                        for (const step of data.steps) {
+                          if (step.type === 'model_output' && step.content?.length > 0) {
+                            for (const part of step.content) {
+                              if (part.type === 'text' && part.text) { text = part.text; break; }
+                            }
+                            if (text) break;
+                          }
+                        }
+                      }
+                      if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API' }); setAiLoading(false); return; }
+                      const jsonMatch = text.match(/\{[\s\S]*\}/);
+                      if (jsonMatch) {
+                        try { const parsed = JSON.parse(jsonMatch[0]); setAiResult({ code: parsed.code || '', explanation: parsed.explanation || text }); setAiLoading(false); return; } catch { /* ignore */ }
+                      }
+                      setAiResult({ code: '', explanation: text });
+                      setAiLoading(false);
+                    })
+                    .catch((err) => { setAiResult({ code: '', explanation: `Erreur réseau : ${err.message}` }); setAiLoading(false); });
+                  };
+                  tryKey(0);
                 }}
                 disabled={aiLoading}
                 style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '48px', padding: '0 28px', backgroundColor: aiLoading ? '#9CA3AF' : '#E51E4D', color: '#FFFFFF', border: 'none', borderRadius: '10px', cursor: aiLoading ? 'not-allowed' : 'pointer', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap', transition: 'background 0.15s' }}

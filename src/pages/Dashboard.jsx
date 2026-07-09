@@ -28,7 +28,6 @@ const Dashboard = () => {
   const [companies, setCompanies] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [notesStats, setNotesStats] = useState({}); // { companyId: { total, monthly } }
-  const [aiStats, setAiStats] = useState({}); // { companyId: { total, monthly } }
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Modals state
@@ -79,25 +78,6 @@ const Dashboard = () => {
           if (new Date(n.created_at) >= startOfMonth) stats[cid].monthly += 1;
         });
         setNotesStats(stats);
-      }
-
-      // Charger les stats de requêtes IA par entreprise
-      const { data: aiData } = await supabase
-        .from('ai_queries')
-        .select('company_id, created_at');
-
-      if (aiData) {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const stats = {};
-        aiData.forEach(n => {
-          const cid = n.company_id;
-          if (!cid) return;
-          if (!stats[cid]) stats[cid] = { total: 0, monthly: 0 };
-          stats[cid].total += 1;
-          if (new Date(n.created_at) >= startOfMonth) stats[cid].monthly += 1;
-        });
-        setAiStats(stats);
       }
     } catch (e) {
       console.error(e);
@@ -306,8 +286,6 @@ const Dashboard = () => {
               <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Agents</th>
               <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Notes ce mois</th>
               <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Notes total</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>IA ce mois</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>IA total</th>
               <th style={{ padding: '0.75rem 1rem' }}>Abonnement</th>
               <th style={{ padding: '0.75rem 1rem' }}>NIF</th>
             </tr>
@@ -346,22 +324,6 @@ const Dashboard = () => {
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>total</span>
                     </div>
                   </td>
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#8b5cf6' }}>
-                        {(aiStats[comp.id]?.monthly) || 0}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ce mois</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#8b5cf6' }}>
-                        {(aiStats[comp.id]?.total) || 0}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>total</span>
-                    </div>
-                  </td>
                   <td style={{ padding: '1rem' }}>
                     <button style={{ backgroundColor: isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: isActive ? 'var(--success)' : 'var(--danger)', border: '1px solid', borderColor: isActive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); handleRenewSubscriptionClick(comp); }}>
                       {isActive ? `Actif (${daysRemaining} j.)` : 'Expiré'}
@@ -373,7 +335,7 @@ const Dashboard = () => {
             })}
             {companies.filter(c => c.id !== 'c_admin').length === 0 && (
               <tr>
-                <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aucune entreprise enregistrée.</td>
+                <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aucune entreprise enregistrée.</td>
               </tr>
             )}
           </tbody>
