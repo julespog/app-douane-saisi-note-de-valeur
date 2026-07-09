@@ -884,45 +884,28 @@ const NoteForm = () => {
                   if (!aiQuery.trim()) return;
                   setAiLoading(true);
                   setAiResult({ code: '', explanation: '' });
-                  const apiKeys = (import.meta.env.VITE_GEMINI_API_KEYS || import.meta.env.VITE_GEMINI_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean);
-                  if (!apiKeys.length) { setAiResult({ code: '', explanation: '❌ Aucune clé API configurée' }); return; }
+                  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+                  if (!apiKey) { setAiResult({ code: '', explanation: '❌ Clé API Groq manquante' }); return; }
                   const prompt = `Tu es un expert en nomenclature douanière du CEMAC/Gabon. Pour ce produit: "${aiQuery}", donne le code SH sur 8 chiffres et une brève explication (chapitre, droits typiques). Réponds avec uniquement ce JSON (sans backticks ni markdown) : {"code":"XXXXXXXX","explanation":"..."}`;
-                  let lastError = '';
-                  const tryKey = (keyIndex) => {
-                    if (keyIndex >= apiKeys.length) { setAiResult({ code: '', explanation: `❌ ${lastError}` }); setAiLoading(false); return; }
-                    const model = 'gemini-2.0-flash';
-                    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKeys[keyIndex] },
-                      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                    })
-                    .then(async r => {
-                      if (r.status === 429) { lastError = `Quota épuisé pour la clé ${keyIndex + 1}`; tryKey(keyIndex + 1); return; }
-                      if (!r.ok) { const errBody = await r.text(); lastError = `Erreur ${r.status}: ${errBody.substring(0, 200)}`; tryKey(keyIndex + 1); return; }
-                      const data = await r.json();
-                      console.log('🔍 Réponse API Gemini brute:', JSON.stringify(data, null, 2));
-                      if (data.error) { setAiResult({ code: '', explanation: `❌ ${data.error.message}` }); setAiLoading(false); return; }
-                      let text = '';
-                      if (data?.candidates?.length > 0) {
-                        for (const candidate of data.candidates) {
-                          if (candidate.content?.parts?.length > 0) {
-                            for (const part of candidate.content.parts) {
-                              if (part.text) { text = part.text; break; }
-                            }
-                            if (text) break;
-                          }
-                        }
-                      }
-                      if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API' }); setAiLoading(false); return; }
-                      const jsonMatch = text.match(/\{[\s\S]*\}/);
-                      if (jsonMatch) {
-                        try { const parsed = JSON.parse(jsonMatch[0]); setAiResult({ code: parsed.code || '', explanation: parsed.explanation || text }); setAiLoading(false); return; } catch { /* ignore */ }
-                      }
-                      setAiResult({ code: '', explanation: text });
-                      setAiLoading(false);
-                    })
-                    .catch((err) => { setAiResult({ code: '', explanation: `Erreur réseau : ${err.message}` }); setAiLoading(false); });
-                  };
+                  fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], temperature: 0.1 })
+                  })
+                  .then(async r => {
+                    if (r.status === 429) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Quota dépassé (429): ${errBody.substring(0, 100)}` }); return; }
+                    if (!r.ok) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Erreur ${r.status}: ${errBody.substring(0, 200)}` }); return; }
+                    const data = await r.json();
+                    const text = data?.choices?.[0]?.message?.content || '';
+                    if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API' }); return; }
+                    const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                      try { const parsed = JSON.parse(jsonMatch[0]); setAiResult({ code: parsed.code || '', explanation: parsed.explanation || text }); return; } catch { /* ignore */ }
+                    }
+                    setAiResult({ code: '', explanation: text });
+                  })
+                  .catch((err) => setAiResult({ code: '', explanation: `Erreur réseau : ${err.message}` }))
+                  .finally(() => setAiLoading(false));
                   tryKey(0);
                 }}
                 disabled={aiLoading}
