@@ -10,6 +10,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import NoteDocument from '../components/NoteDocument';
 import { DatabaseContext } from '../context/DatabaseContext';
 import { UserContext } from '../context/UserContext';
+import { supabase } from '../supabaseClient';
 import CustomPDFViewer from '../components/CustomPDFViewer';
 import { distributeTotals } from '../utils/weightDistribution';
 
@@ -27,6 +28,14 @@ const INITIAL_VALEURS = {
   vFacture: '', vFactureCalculee: '', vFret: '', vAssurance: '',
   tauxAssurance: '0.05', vCommission: '', vTauxAjust: '', vFraisDivers: '',
   cafDevise: '', cafCFA: '', modeAssurance: 'auto'
+};
+
+const CURRENCY_RATES = {
+  XAF: 1, XOF: 1, EUR: 0.001524, USD: 0.00166,
+  GBP: 0.00131, JPY: 0.248, CNY: 0.0120, CAD: 0.00228,
+  CHF: 0.00148, ZAR: 0.0308, AED: 0.00610, MAD: 0.0165,
+  AUD: 0.00255, SGD: 0.00223, INR: 0.138, BRL: 0.00830,
+  RUB: 0.152, NGN: 2.52, KES: 0.214, GHS: 0.0255
 };
 
 const NoteForm = () => {
@@ -77,6 +86,11 @@ const NoteForm = () => {
   const [aiQuery, setAiQuery] = useState('');
   const [aiResult, setAiResult] = useState({ code: '', explanation: '' });
   const [aiLoading, setAiLoading] = useState(false);
+
+  // Currency converter
+  const [convAmount, setConvAmount] = useState('');
+  const [convFrom, setConvFrom] = useState('EUR');
+  const [convTo, setConvTo] = useState('XAF');
 
   // Nouveau state pour l'article en cours d'ajout
   const [newArticle, setNewArticle] = useState(null);
@@ -856,6 +870,36 @@ const NoteForm = () => {
                 </select>
               </div>
             </div>
+
+            <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <Calculator size={14} style={{ color: 'var(--text-secondary)' }} />
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Convertisseur</span>
+              <input
+                type="number"
+                value={convAmount}
+                onChange={e => setConvAmount(e.target.value)}
+                placeholder="Montant"
+                style={{ width: '100px', padding: '0.35rem 0.5rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-primary)', outline: 'none' }}
+              />
+              <select value={convFrom} onChange={e => setConvFrom(e.target.value)} style={{ width: '75px', padding: '0.35rem 0.2rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-primary)', outline: 'none' }}>
+                {['XAF','EUR','USD','GBP','JPY','CNY','CAD','CHF','ZAR','AED','MAD','XOF','AUD','SGD','INR','BRL','RUB','NGN','KES','GHS'].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>→</span>
+              <select value={convTo} onChange={e => setConvTo(e.target.value)} style={{ width: '75px', padding: '0.35rem 0.2rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-primary)', outline: 'none' }}>
+                {['XAF','EUR','USD','GBP','JPY','CNY','CAD','CHF','ZAR','AED','MAD','XOF','AUD','SGD','INR','BRL','RUB','NGN','KES','GHS'].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                {(() => {
+                  if (!convAmount || isNaN(convAmount)) return '';
+                  const taux = parseFloat(infos.tauxDevise);
+                  const getRate = cur => (cur === infos.devise && taux > 0) ? 1 / taux : CURRENCY_RATES[cur];
+                  const fromR = getRate(convFrom);
+                  const toR = getRate(convTo);
+                  if (!fromR || !toR) return '';
+                  return `${(parseFloat(convAmount) * toR / fromR).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${convTo}`;
+                })()}
+              </span>
+            </div>
           </div>
 
           {/* ASSISTANT DE CLASSEMENT DOUANIER (IA) */}
@@ -884,45 +928,29 @@ const NoteForm = () => {
                   if (!aiQuery.trim()) return;
                   setAiLoading(true);
                   setAiResult({ code: '', explanation: '' });
-                  const apiKeys = (import.meta.env.VITE_GEMINI_API_KEYS || import.meta.env.VITE_GEMINI_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean);
-                  if (!apiKeys.length) { setAiResult({ code: '', explanation: '❌ Aucune clé API configurée' }); return; }
+                  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+                  if (!apiKey) { setAiResult({ code: '', explanation: '❌ Clé API Groq manquante' }); return; }
                   const prompt = `Tu es un expert en nomenclature douanière du CEMAC/Gabon. Pour ce produit: "${aiQuery}", donne le code SH sur 8 chiffres et une brève explication (chapitre, droits typiques). Réponds avec uniquement ce JSON (sans backticks ni markdown) : {"code":"XXXXXXXX","explanation":"..."}`;
-                  let lastError = '';
-                  const tryKey = (keyIndex) => {
-                    if (keyIndex >= apiKeys.length) { setAiResult({ code: '', explanation: `❌ ${lastError}` }); setAiLoading(false); return; }
-                    fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKeys[keyIndex] },
-                      body: JSON.stringify({ model: 'gemini-3.5-flash', input: prompt, generation_config: { thinking_level: 'minimal' } })
-                    })
-                    .then(async r => {
-                      if (r.status === 429) { lastError = `Quota épuisé pour la clé ${keyIndex + 1}`; tryKey(keyIndex + 1); return; }
-                      if (!r.ok) { const errBody = await r.text(); lastError = `Erreur ${r.status}: ${errBody.substring(0, 200)}`; tryKey(keyIndex + 1); return; }
-                      const data = await r.json();
-                      console.log('🔍 Réponse API Gemini brute:', JSON.stringify(data, null, 2));
-                      if (data.error) { setAiResult({ code: '', explanation: `❌ ${data.error.message}` }); setAiLoading(false); return; }
-                      let text = '';
-                      if (data?.steps?.length > 0) {
-                        for (const step of data.steps) {
-                          if (step.type === 'model_output' && step.content?.length > 0) {
-                            for (const part of step.content) {
-                              if (part.type === 'text' && part.text) { text = part.text; break; }
-                            }
-                            if (text) break;
-                          }
-                        }
-                      }
-                      if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API' }); setAiLoading(false); return; }
-                      const jsonMatch = text.match(/\{[\s\S]*\}/);
-                      if (jsonMatch) {
-                        try { const parsed = JSON.parse(jsonMatch[0]); setAiResult({ code: parsed.code || '', explanation: parsed.explanation || text }); setAiLoading(false); return; } catch { /* ignore */ }
-                      }
-                      setAiResult({ code: '', explanation: text });
-                      setAiLoading(false);
-                    })
-                    .catch((err) => { setAiResult({ code: '', explanation: `Erreur réseau : ${err.message}` }); setAiLoading(false); });
-                  };
-                  tryKey(0);
+                  fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], temperature: 0.1 })
+                  })
+                  .then(async r => {
+                    if (r.status === 429) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Quota dépassé (429): ${errBody.substring(0, 100)}` }); return; }
+                    if (!r.ok) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Erreur ${r.status}: ${errBody.substring(0, 200)}` }); return; }
+                    const data = await r.json();
+                    const text = data?.choices?.[0]?.message?.content || '';
+                    supabase.from('ai_queries').insert({ company_id: user?.companyId || user?.company_id, user_id: user?.id, query: aiQuery, response: text }).then(({ error }) => { if (error) console.error('AI log error:', error); }).catch(err => console.error('AI log catch:', err));
+                    if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API' }); return; }
+                    const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                      try { const parsed = JSON.parse(jsonMatch[0]); setAiResult({ code: parsed.code || '', explanation: parsed.explanation || text }); return; } catch { /* ignore */ }
+                    }
+                    setAiResult({ code: '', explanation: text });
+                  })
+                  .catch((err) => setAiResult({ code: '', explanation: `Erreur réseau : ${err.message}` }))
+                  .finally(() => setAiLoading(false));
                 }}
                 disabled={aiLoading}
                 style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '48px', padding: '0 28px', backgroundColor: aiLoading ? '#9CA3AF' : '#E51E4D', color: '#FFFFFF', border: 'none', borderRadius: '10px', cursor: aiLoading ? 'not-allowed' : 'pointer', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap', transition: 'background 0.15s' }}
