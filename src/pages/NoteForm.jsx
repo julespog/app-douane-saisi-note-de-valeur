@@ -890,10 +890,11 @@ const NoteForm = () => {
                   let lastError = '';
                   const tryKey = (keyIndex) => {
                     if (keyIndex >= apiKeys.length) { setAiResult({ code: '', explanation: `❌ ${lastError}` }); setAiLoading(false); return; }
-                    fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+                    const model = 'gemini-2.0-flash';
+                    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKeys[keyIndex] },
-                      body: JSON.stringify({ model: 'gemini-2.0-flash', input: prompt, generation_config: { thinking_level: 'minimal' } })
+                      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                     })
                     .then(async r => {
                       if (r.status === 429) { lastError = `Quota épuisé pour la clé ${keyIndex + 1}`; tryKey(keyIndex + 1); return; }
@@ -902,11 +903,11 @@ const NoteForm = () => {
                       console.log('🔍 Réponse API Gemini brute:', JSON.stringify(data, null, 2));
                       if (data.error) { setAiResult({ code: '', explanation: `❌ ${data.error.message}` }); setAiLoading(false); return; }
                       let text = '';
-                      if (data?.steps?.length > 0) {
-                        for (const step of data.steps) {
-                          if (step.type === 'model_output' && step.content?.length > 0) {
-                            for (const part of step.content) {
-                              if (part.type === 'text' && part.text) { text = part.text; break; }
+                      if (data?.candidates?.length > 0) {
+                        for (const candidate of data.candidates) {
+                          if (candidate.content?.parts?.length > 0) {
+                            for (const part of candidate.content.parts) {
+                              if (part.text) { text = part.text; break; }
                             }
                             if (text) break;
                           }
