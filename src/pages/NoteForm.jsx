@@ -893,7 +893,7 @@ const NoteForm = () => {
                     fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKeys[keyIndex] },
-                      body: JSON.stringify({ model: 'gemini-3.5-flash', input: prompt, generation_config: { thinking_level: 'minimal' } })
+                      body: JSON.stringify({ model: 'gemini-2.0-flash', input: prompt, generation_config: { thinking_level: 'minimal' } })
                     })
                     .then(async r => {
                       if (r.status === 429) { lastError = `Quota épuisé pour la clé ${keyIndex + 1}`; tryKey(keyIndex + 1); return; }
