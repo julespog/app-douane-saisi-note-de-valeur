@@ -10,6 +10,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import NoteDocument from '../components/NoteDocument';
 import { DatabaseContext } from '../context/DatabaseContext';
 import { UserContext } from '../context/UserContext';
+import { supabase } from '../supabaseClient';
 import CustomPDFViewer from '../components/CustomPDFViewer';
 import { distributeTotals } from '../utils/weightDistribution';
 
@@ -897,6 +898,7 @@ const NoteForm = () => {
                     if (!r.ok) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Erreur ${r.status}: ${errBody.substring(0, 200)}` }); return; }
                     const data = await r.json();
                     const text = data?.choices?.[0]?.message?.content || '';
+                    supabase.from('ai_queries').insert({ company_id: user?.companyId, user_id: user?.id, query: aiQuery, response: text }).then().catch(() => {});
                     if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API' }); return; }
                     const jsonMatch = text.match(/\{[\s\S]*\}/);
                     if (jsonMatch) {
@@ -906,7 +908,6 @@ const NoteForm = () => {
                   })
                   .catch((err) => setAiResult({ code: '', explanation: `Erreur réseau : ${err.message}` }))
                   .finally(() => setAiLoading(false));
-                  tryKey(0);
                 }}
                 disabled={aiLoading}
                 style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '48px', padding: '0 28px', backgroundColor: aiLoading ? '#9CA3AF' : '#E51E4D', color: '#FFFFFF', border: 'none', borderRadius: '10px', cursor: aiLoading ? 'not-allowed' : 'pointer', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap', transition: 'background 0.15s' }}
