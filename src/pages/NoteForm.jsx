@@ -898,7 +898,7 @@ const NoteForm = () => {
                     if (!r.ok) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Erreur ${r.status}: ${errBody.substring(0, 200)}` }); return; }
                     const data = await r.json();
                     const text = data?.choices?.[0]?.message?.content || '';
-                    supabase.from('ai_queries').insert({ company_id: user?.companyId, user_id: user?.id, query: aiQuery, response: text }).then().catch(() => {});
+                    supabase.from('ai_queries').insert({ company_id: user?.companyId || user?.company_id, user_id: user?.id, query: aiQuery, response: text }).then(({ error }) => { if (error) console.error('AI log error:', error); }).catch(err => console.error('AI log catch:', err));
                     if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API' }); return; }
                     const jsonMatch = text.match(/\{[\s\S]*\}/);
                     if (jsonMatch) {
