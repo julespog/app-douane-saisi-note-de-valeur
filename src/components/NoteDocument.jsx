@@ -190,7 +190,7 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                   {/* Ligne 8 */}
                   <tr>
                     <td style={darkTdStyle}>
-                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.FRET:</span> <span>{formatWithDots(valeurs.vFret)}</span></div>
+                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.FRET:</span> <span>{formatWithDots(valeurs.vFret)} {valeurs.vFretDevise || ''}</span></div>
                     </td>
                     <td style={thStyle}>Origine</td>
                     {[...Array(5)].map((_, i) => <td key={i} style={{...tdStyle, fontWeight: 'bold'}}>{chunk[i] ? (COUNTRY_CODES[chunk[i].origine] || (chunk[i].origine ? chunk[i].origine.substring(0, 2).toUpperCase() : '')) : ''}</td>)}
@@ -198,7 +198,7 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                   {/* Ligne 9 */}
                   <tr>
                     <td style={darkTdStyle}>
-                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.ASSURANCE:</span> <span>{formatWithDots(valeurs.vAssurance)}</span></div>
+                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.ASSURANCE:</span> <span>{formatWithDots(valeurs.vAssurance)} FCFA</span></div>
                     </td>
                     <td style={thStyle}>P. Brut</td>
                     {[...Array(5)].map((_, i) => <td key={i} style={tdStyle}>{chunk[i] ? chunk[i].pBrut : ''}</td>)}
@@ -222,18 +222,20 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                   {/* Ligne 12 */}
                   <tr>
                     <td style={darkTdStyle}>
-                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.FRAIS DIVERS:</span> <span>{formatWithDots(valeurs.vFraisDivers)}</span></div>
+                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.FRAIS DIVERS:</span> <span>{formatWithDots(valeurs.vFraisDivers)} {valeurs.vFraisDevise || ''}</span></div>
                     </td>
                     <td style={thStyle}>V. Statistique</td>
                     {[...Array(5)].map((_, i) => <td key={i} style={{...tdStyle, fontWeight: 'bold', backgroundColor: '#f8fafc'}}>{chunk[i] ? formatWithDots(chunk[i].valeurImposable) : ''}</td>)}
                   </tr>
                   {/* Ligne 13 */}
-                  <tr>
-                    <td style={{ ...darkTdStyle, backgroundColor: 'white' }}>
-                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>C.A.F (devise):</span> <span>{formatWithDots(valeurs.cafDevise)}</span></div>
-                    </td>
-                    <td colSpan={6} rowSpan={2} style={{ borderTop: tableBorderStyle, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'white' }}></td>
-                  </tr>
+                  {valeurs.cafDevise !== '' && valeurs.cafDevise !== undefined && (
+                    <tr>
+                      <td style={{ ...darkTdStyle, backgroundColor: 'white' }}>
+                        <div style={{display: 'flex', justifyContent: 'space-between'}}><span>C.A.F (devise):</span> <span>{formatWithDots(valeurs.cafDevise)}</span></div>
+                      </td>
+                      <td colSpan={6} rowSpan={2} style={{ borderTop: tableBorderStyle, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'white' }}></td>
+                    </tr>
+                  )}
                   {/* Ligne 14 */}
                   <tr>
                     <td style={{ ...darkTdStyle, backgroundColor: '#f1f5f9' }}>
@@ -289,52 +291,48 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                       })}
                     </tr>
                     <tr style={{ backgroundColor: '#f8fafc' }}>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Code SH</td>
+                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', fontWeight: 'bold', color: '#0c4a6e' }}>{tableChunk[i] ? String(tableChunk[i].codeSH).padEnd(8, '0').substring(0, 8) : ''}</td>)}
+                    </tr>
+                    <tr>
                       <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Code Additionnel</td>
                       {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? (tableChunk[i].codeAdditionnel || '000') : ''}</td>)}
                     </tr>
-                    <tr>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Pays d'origine</td>
-                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? (COUNTRY_CODES[tableChunk[i].origine] || (tableChunk[i].origine ? tableChunk[i].origine.substring(0, 2).toUpperCase() : '')) : ''}</td>)}
-                    </tr>
                     <tr style={{ backgroundColor: '#f8fafc' }}>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>{infos.typeLieu || 'Provenance'}</td>
-                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? (COUNTRY_CODES[infos.provenance] || infos.provenance.substring(0, 2).toUpperCase()) : ''}</td>)}
-                    </tr>
-                    <tr>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Tarif Douane</td>
-                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', fontWeight: 'bold', color: '#0c4a6e' }}>{tableChunk[i] ? String(tableChunk[i].codeSH).padEnd(8, '0').substring(0, 8) : ''}</td>)}
-                    </tr>
-                    <tr style={{ backgroundColor: '#f8fafc' }}>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Valeur Achat</td>
-                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? formatWithDots(tableChunk[i].valeur) : ''}</td>)}
-                    </tr>
-                    <tr>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Valeur Statistique (CAF)</td>
-                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? formatWithDots(tableChunk[i].valeurImposable) : ''}</td>)}
-                    </tr>
-                    <tr style={{ backgroundColor: '#f8fafc' }}>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Valeur Imposable</td>
-                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? formatWithDots(tableChunk[i].valeurImposable) : ''}</td>)}
-                    </tr>
-                    <tr>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Unité complémentaire</td>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Unité Supp</td>
                       {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? `${tableChunk[i].quantite || ''} ${tableChunk[i].unite || ''}` : ''}</td>)}
                     </tr>
-                    <tr style={{ backgroundColor: '#f8fafc' }}>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Quantités</td>
+                    <tr>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Quantité</td>
                       {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? tableChunk[i].quantite : ''}</td>)}
                     </tr>
-                    <tr>
+                    <tr style={{ backgroundColor: '#f8fafc' }}>
                       <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Nombre de colis</td>
                       {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? tableChunk[i].colis : ''}</td>)}
                     </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>{infos.typeLieu || 'Provenance'}</td>
+                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? (COUNTRY_CODES[infos.provenance] || infos.provenance.substring(0, 2).toUpperCase()) : ''}</td>)}
+                    </tr>
                     <tr style={{ backgroundColor: '#f8fafc' }}>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Poids Brut (Kgs)</td>
-                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? tableChunk[i].pBrut : ''}</td>)}
+                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Origine</td>
+                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? (COUNTRY_CODES[tableChunk[i].origine] || (tableChunk[i].origine ? tableChunk[i].origine.substring(0, 2).toUpperCase() : '')) : ''}</td>)}
                     </tr>
                     <tr>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Poids Net (Kgs)</td>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>P. Brut</td>
+                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? tableChunk[i].pBrut : ''}</td>)}
+                    </tr>
+                    <tr style={{ backgroundColor: '#f8fafc' }}>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>P. Net</td>
                       {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? tableChunk[i].pNet : ''}</td>)}
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>V. Facture</td>
+                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? formatWithDots(tableChunk[i].valeur) : ''}</td>)}
+                    </tr>
+                    <tr style={{ backgroundColor: '#f8fafc' }}>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>V. Statistique</td>
+                      {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', fontWeight: 'bold', backgroundColor: '#f8fafc', color: '#1e293b' }}>{tableChunk[i] ? formatWithDots(tableChunk[i].valeurImposable) : ''}</td>)}
                     </tr>
                   </tbody>
                 </table>
