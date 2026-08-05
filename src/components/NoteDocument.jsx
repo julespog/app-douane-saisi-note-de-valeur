@@ -307,7 +307,7 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                       {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? tableChunk[i].quantite : ''}</td>)}
                     </tr>
                     <tr style={{ backgroundColor: '#f8fafc' }}>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Nbro. Colis</td>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', backgroundColor: '#f0f9ff', color: '#0c4a6e' }}>Nombre de colis</td>
                       {[...Array(6)].map((_, i) => <td key={i} style={{ border: '1px solid #cbd5e1', padding: '2px 4px', color: '#1e293b' }}>{tableChunk[i] ? tableChunk[i].colis : ''}</td>)}
                     </tr>
                     <tr>
