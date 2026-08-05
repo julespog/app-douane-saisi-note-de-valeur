@@ -176,7 +176,7 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                   {/* Ligne 6 */}
                   <tr>
                     <td style={{ ...darkThStyle }}>NOTE DE VALEURS:</td>
-                    <td style={thStyle}>Nbro. Colis</td>
+                    <td style={thStyle}>Nombre de colis</td>
                     {[...Array(5)].map((_, i) => <td key={i} style={{...tdStyle, fontWeight: 'bold'}}>{chunk[i] ? chunk[i].colis : ''}</td>)}
                   </tr>
                   {/* Ligne 7 */}
