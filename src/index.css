@@ -348,3 +348,9 @@ input[type=number] {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+.markdown-container h3, .markdown-container h4 { margin-top: 1rem; margin-bottom: 0.5rem; color: var(--text-primary); }
+.markdown-container ul { padding-left: 1.5rem; margin-bottom: 1rem; }
+.markdown-container li { margin-bottom: 0.25rem; }
+.markdown-container p { margin-bottom: 0.75rem; }
+.markdown-container strong { color: var(--accent-primary); }

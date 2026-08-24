@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { 
   Search, Plus, Trash2, Save, Download, 
-  Printer, BookOpen, FileText, CheckCircle, Calculator, Package, CreditCard, AlertCircle, Folder, Lock, Copy, Bot, GraduationCap, RefreshCw, ClipboardCopy
+  Printer, BookOpen, FileText, CheckCircle, Package, CreditCard, AlertCircle, Folder, Lock, Copy, Bot, GraduationCap, RefreshCw, ClipboardCopy
 } from 'lucide-react';
 import { applyGroupingLogic } from '../utils/groupingLogic';
 import { COUNTRIES } from '../utils/countries';
@@ -13,6 +13,7 @@ import { UserContext } from '../context/UserContext';
 import { supabase } from '../supabaseClient';
 import CustomPDFViewer from '../components/CustomPDFViewer';
 import { distributeTotals } from '../utils/weightDistribution';
+import ReactMarkdown from 'react-markdown';
 
 const INITIAL_INFOS = {
   noDossier: '', noOT: '', noCDEMarque: '', noRepertoire: '',
@@ -26,6 +27,8 @@ const INITIAL_INFOS = {
 
 const INITIAL_VALEURS = {
   vFacture: '', vFactureCalculee: '', vFret: '', vAssurance: '',
+  vFretDevise: 'EUR', vFretTaux: '655.957',
+  vFraisDevise: 'EUR', vFraisTaux: '655.957',
   tauxAssurance: '0.05', vCommission: '', vTauxAjust: '', vFraisDivers: '',
   cafDevise: '', cafCFA: '', modeAssurance: 'auto'
 };
@@ -87,10 +90,6 @@ const NoteForm = () => {
   const [aiResult, setAiResult] = useState({ code: '', explanation: '' });
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Currency converter
-  const [convAmount, setConvAmount] = useState('');
-  const [convFrom, setConvFrom] = useState('EUR');
-  const [convTo, setConvTo] = useState('XAF');
 
   // Nouveau state pour l'article en cours d'ajout
   const [newArticle, setNewArticle] = useState(null);
@@ -220,39 +219,52 @@ const NoteForm = () => {
     const totalFOBArticles = articles.reduce((sum, art) => sum + parseNumber(art.valeur), 0);
     const facture = parseNumber(valeurs.vFacture) || totalFOBArticles;
     
-    const fret = parseNumber(valeurs.vFret);
+    const tauxDev = parseNumber(infos.tauxDevise) || 1;
+    const fretTaux = parseNumber(valeurs.vFretTaux) || 1;
+    const fraisTaux = parseNumber(valeurs.vFraisTaux) || 1;
     const tauxAss = parseNumber(valeurs.tauxAssurance);
     const commission = parseNumber(valeurs.vCommission);
     const fraisDivers = parseNumber(valeurs.vFraisDivers);
     const ajustement = parseNumber(valeurs.vTauxAjust);
 
-    // L'assurance dépend du mode
-    let assurance = 0;
-    if (valeurs.modeAssurance === 'manuel') {
-      assurance = parseNumber(valeurs.vAssurance);
-    } else {
-      assurance = (facture + fret + fraisDivers) * (tauxAss / 100);
-    }
-    
-    const tauxDev = parseNumber(infos.tauxDevise) || 1;
+    // Chaque composant est converti dans sa propre devise vers le FCFA
+    const factureCFA = facture * tauxDev;
+    const fretCFA = parseNumber(valeurs.vFret) * fretTaux;
+    const fraisCFA = fraisDivers * fraisTaux;
+    const commissionCFA = commission * tauxDev;
+    const ajustementCFA = ajustement * tauxDev;
 
-    // Les autres frais s'ajoutent/se soustraient à la valeur CAF en devise
-    const cafDev = facture + fret + assurance + commission + fraisDivers - ajustement;
-    const cafC = cafDev * tauxDev;
+    // L'assurance est toujours en FCFA (aucun taux de conversion)
+    let assuranceCFA = 0;
+    if (valeurs.modeAssurance === 'manuel') {
+      assuranceCFA = parseNumber(valeurs.vAssurance);
+    } else {
+      assuranceCFA = (factureCFA + fretCFA + fraisCFA) * (tauxAss / 100);
+    }
+
+    // CAF total en FCFA (addition directe des montants convertis, plus de conversion globale)
+    const cafC = factureCFA + fretCFA + fraisCFA + assuranceCFA + commissionCFA - ajustementCFA;
+
+    // CAF en devise : affiché uniquement si TOUS les éléments partagent la même devise.
+    // L'assurance étant fixe en FCFA, la devise commune doit être le FCFA (XAF/XOF).
+    const allSameCurrency = (valeurs.vFretDevise || infos.devise) === infos.devise
+      && (valeurs.vFraisDevise || infos.devise) === infos.devise
+      && (infos.devise === 'XAF' || infos.devise === 'XOF');
+    const cafDevise = allSameCurrency ? cafC.toFixed(2) : '';
 
     setValeurs(prev => {
       const newState = {
         ...prev,
         vFactureCalculee: totalFOBArticles.toFixed(2),
-        cafDevise: cafDev.toFixed(2),
+        cafDevise,
         cafCFA: cafC.toFixed(0)
       };
       if (prev.modeAssurance !== 'manuel') {
-        newState.vAssurance = assurance.toFixed(2);
+        newState.vAssurance = assuranceCFA.toFixed(2);
       }
       return newState;
     });
-  }, [valeurs.vFacture, valeurs.vFret, valeurs.tauxAssurance, valeurs.vCommission, valeurs.vFraisDivers, valeurs.vTauxAjust, valeurs.modeAssurance, valeurs.vAssurance, infos.tauxDevise, articles]);
+  }, [valeurs.vFacture, valeurs.vFret, valeurs.vFretTaux, valeurs.vFretDevise, valeurs.vFraisDivers, valeurs.vFraisTaux, valeurs.vFraisDevise, valeurs.tauxAssurance, valeurs.vCommission, valeurs.vTauxAjust, valeurs.modeAssurance, valeurs.vAssurance, infos.tauxDevise, infos.devise, articles]);
 
   // L'auto-somme bottom-up (articles -> header) a été désactivée car elle écrasait 
   // les valeurs globales saisies manuellement par l'utilisateur, ce qui cassait
@@ -870,40 +882,10 @@ const NoteForm = () => {
                 </select>
               </div>
             </div>
-
-            <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <Calculator size={14} style={{ color: 'var(--text-secondary)' }} />
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Convertisseur</span>
-              <input
-                type="number"
-                value={convAmount}
-                onChange={e => setConvAmount(e.target.value)}
-                placeholder="Montant"
-                style={{ width: '100px', padding: '0.35rem 0.5rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-primary)', outline: 'none' }}
-              />
-              <select value={convFrom} onChange={e => setConvFrom(e.target.value)} style={{ width: '75px', padding: '0.35rem 0.2rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-primary)', outline: 'none' }}>
-                {['XAF','EUR','USD','GBP','JPY','CNY','CAD','CHF','ZAR','AED','MAD','XOF','AUD','SGD','INR','BRL','RUB','NGN','KES','GHS'].map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>→</span>
-              <select value={convTo} onChange={e => setConvTo(e.target.value)} style={{ width: '75px', padding: '0.35rem 0.2rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-primary)', outline: 'none' }}>
-                {['XAF','EUR','USD','GBP','JPY','CNY','CAD','CHF','ZAR','AED','MAD','XOF','AUD','SGD','INR','BRL','RUB','NGN','KES','GHS'].map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                {(() => {
-                  if (!convAmount || isNaN(convAmount)) return '';
-                  const taux = parseFloat(infos.tauxDevise);
-                  const getRate = cur => (cur === infos.devise && taux > 0) ? 1 / taux : CURRENCY_RATES[cur];
-                  const fromR = getRate(convFrom);
-                  const toR = getRate(convTo);
-                  if (!fromR || !toR) return '';
-                  return `${(parseFloat(convAmount) * toR / fromR).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${convTo}`;
-                })()}
-              </span>
-            </div>
           </div>
 
-          {/* ASSISTANT DE CLASSEMENT DOUANIER (IA) */}
-          <div style={{ ...cardStyle, padding: '1.5rem 2rem' }}>
+          {/* RECHERCHE IA */}
+          <div style={{ ...cardStyle, marginTop: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
               <div style={{ width: 36, height: 36, backgroundColor: '#E51E4D', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Bot size={20} style={{ color: '#FFFFFF' }} />
@@ -928,48 +910,85 @@ const NoteForm = () => {
                   if (!aiQuery.trim()) return;
                   setAiLoading(true);
                   setAiResult({ code: '', explanation: '' });
-                  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
-                  if (!apiKey) { setAiResult({ code: '', explanation: '❌ Clé API Groq manquante' }); return; }
-                  const prompt = `Tu es un expert en nomenclature douanière du CEMAC/Gabon. Pour ce produit: "${aiQuery}", donne le code SH sur 8 chiffres et une brève explication (chapitre, droits typiques). Réponds avec uniquement ce JSON (sans backticks ni markdown) : {"code":"XXXXXXXX","explanation":"..."}`;
-                  const groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
-                  const proxyUrl = 'https://proxy.2677929.xyz/';
-                  fetch(proxyUrl + groqUrl, {
+                  const prompt = `En tant qu'expert strict en nomenclature douanière de la CEMAC (spécifiquement pour le Gabon), analyse le produit suivant : "${aiQuery}".
+⚠️ RÈGLE ABSOLUE : Tes résultats doivent se baser UNIQUEMENT sur le Tarif Extérieur Commun (TEC) de la CEMAC et la réglementation du Gabon. Ne cite AUCUNE autre législation étrangère (comme l'UE ou le Canada).
+Fournis le code SH CEMAC (à 8 chiffres) le plus pertinent.
+IMPORTANT: Utilise du Markdown pour structurer ta réponse (titres ###, gras, puces).
+Structure ta réponse en 2 parties claires :
+1. Le Code SH CEMAC (justification selon les règles, et alternatives possibles à 8 chiffres).
+2. Description détaillée du produit et des critères de classement.
+Tu dois répondre avec un objet JSON valide contenant exactement ces 2 clés : "code" et "explanation". L'explication doit contenir le markdown.`;
+                  fetch('/api/ai', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                    body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], temperature: 0.1 })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt })
                   })
                   .then(async r => {
                     if (r.status === 429) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Quota dépassé (429): ${errBody.substring(0, 100)}` }); return; }
                     if (!r.ok) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Erreur ${r.status}: ${errBody.substring(0, 200)}` }); return; }
                     const data = await r.json();
-                    const text = data?.choices?.[0]?.message?.content || '';
+                    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
                     supabase.from('ai_queries').insert({ company_id: user?.companyId || user?.company_id, user_id: user?.id, query: aiQuery, response: text }).then(({ error }) => { if (error) console.error('AI log error:', error); }).catch(err => console.error('AI log catch:', err));
-                    if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API' }); return; }
+                    if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API Gemini' }); return; }
+
+                    let parsedCode = '';
+                    let parsedExplanation = text;
                     const jsonMatch = text.match(/\{[\s\S]*\}/);
                     if (jsonMatch) {
-                      try { const parsed = JSON.parse(jsonMatch[0]); setAiResult({ code: parsed.code || '', explanation: parsed.explanation || text }); return; } catch { /* ignore */ }
+                      try {
+                        const parsed = JSON.parse(jsonMatch[0]);
+                        parsedCode = parsed.code || '';
+                        parsedExplanation = parsed.explanation || text;
+                      } catch { /* ignore */ }
                     }
-                    setAiResult({ code: '', explanation: text });
+
+                    if (parsedCode && typeof tariffs !== 'undefined' && tariffs.length > 0) {
+                      const keys = getTariffDisplay(tariffs[0]);
+                      const cleanCode = parsedCode.replace(/[\s.]/g, '');
+                      let match = tariffs.find(t => {
+                        const code = String(t[keys.codeSHKey] || '').replace(/[\s.]/g, '');
+                        const cemac = keys.cemacKey ? String(t[keys.cemacKey] || '').replace(/[\s.]/g, '') : '';
+                        return (code + cemac).padEnd(8, '0').substring(0, 8) === cleanCode;
+                      });
+                      if (!match && cleanCode.length >= 6) {
+                        const clean6 = cleanCode.substring(0, 6);
+                        match = tariffs.find(t => {
+                          const code = String(t[keys.codeSHKey] || '').replace(/[\s.]/g, '');
+                          return code.substring(0, 6) === clean6;
+                        });
+                      }
+                      if (match) {
+                        const rawCodeSH = String(match[keys.codeSHKey] || '').replace(/[\s.]/g, '');
+                        const rawCemac = keys.cemacKey ? String(match[keys.cemacKey] || '').replace(/[\s.]/g, '') : '';
+                        const realCode = (rawCodeSH + rawCemac).padEnd(8, '0').substring(0, 8);
+                        if (parsedCode && parsedCode !== realCode) {
+                          parsedExplanation = parsedExplanation.replace(new RegExp(parsedCode, 'g'), realCode);
+                        }
+                        parsedCode = realCode;
+                      }
+                    }
+
+                    setAiResult({ code: parsedCode, explanation: parsedExplanation });
                   })
                   .catch((err) => setAiResult({ code: '', explanation: `Erreur réseau : ${err.message}` }))
                   .finally(() => setAiLoading(false));
                 }}
                 disabled={aiLoading}
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '48px', padding: '0 28px', backgroundColor: aiLoading ? '#9CA3AF' : '#E51E4D', color: '#FFFFFF', border: 'none', borderRadius: '10px', cursor: aiLoading ? 'not-allowed' : 'pointer', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap', transition: 'background 0.15s' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '48px', padding: '0 28px', backgroundColor: aiLoading ? '#9CA3AF' : '#E51E4D', color: '#FFFFFF', border: 'none', borderRadius: '10px', cursor: aiLoading ? 'not-allowed' : 'pointer', fontSize: '0.95rem', fontWeight: 600, whiteSpace: 'nowrap', transition: 'background 0.15s' }}
               >
                 {aiLoading ? <RefreshCw size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={18} />}
                 {aiLoading ? 'Recherche en cours…' : 'Trouver le code SH'}
               </button>
               <button
-                onClick={() => { setAiQuery(''); setAiResult({ code: '', explanation: '' }); }}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '48px', padding: '0 20px', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 500, fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap' }}
+                onClick={() => { setAiQuery(''); setAiResult({ code: '', explanation: '', taux: '' }); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '48px', padding: '0 20px', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 500, whiteSpace: 'nowrap' }}
               >
                 Effacer
               </button>
             </div>
 
             {(aiResult.code || aiResult.explanation) && !aiLoading && (
-              <div style={{ marginTop: '1.25rem', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.25rem 1.5rem' }}>
+              <div style={{ marginTop: '16px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.25rem 1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
                   <div style={{ flexShrink: 0 }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.35rem' }}>Code SH proposé</div>
@@ -977,8 +996,10 @@ const NoteForm = () => {
                   </div>
                   {aiResult.explanation && (
                     <div style={{ flex: 1, minWidth: '200px' }}>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.35rem' }}>Description</div>
-                      <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: '1.5' }}>{aiResult.explanation}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.35rem' }}>Description détaillée</div>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: '1.6' }} className="markdown-container">
+                        <ReactMarkdown>{aiResult.explanation}</ReactMarkdown>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -988,15 +1009,22 @@ const NoteForm = () => {
                       if (aiResult.code && tariffs.length > 0) {
                         const keys = getTariffDisplay(tariffs[0]);
                         const cleanCode = aiResult.code.replace(/[\s.]/g, '');
-                        const match = tariffs.find(t => {
+                        let match = tariffs.find(t => {
                           const code = String(t[keys.codeSHKey] || '').replace(/[\s.]/g, '');
                           const cemac = keys.cemacKey ? String(t[keys.cemacKey] || '').replace(/[\s.]/g, '') : '';
                           return (code + cemac).padEnd(8, '0').substring(0, 8) === cleanCode;
                         });
+                        if (!match && cleanCode.length >= 6) {
+                          const clean6 = cleanCode.substring(0, 6);
+                          match = tariffs.find(t => {
+                            const code = String(t[keys.codeSHKey] || '').replace(/[\s.]/g, '');
+                            return code.substring(0, 6) === clean6;
+                          });
+                        }
                         if (match) selectTariff(match);
                         else {
                           setNewArticle({
-                            id: Date.now(), codeSH: cleanCode, intitule: aiResult.explanation || '',
+                            id: Date.now(), codeSH: cleanCode, intitule: aiQuery || '',
                             tauxDD: '0', unite: 'KGM', origine: infos.provenance || 'NC',
                             quantite: '1', valeur: '', pBrut: '', pNet: '', colis: '1', codeAdditionnel: '000',
                           });
@@ -1006,7 +1034,7 @@ const NoteForm = () => {
                       }
                     }}
                     disabled={!aiResult.code}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px', padding: '0 22px', backgroundColor: '#E51E4D', color: '#FFFFFF', border: 'none', borderRadius: '8px', cursor: !aiResult.code ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 600, fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap', opacity: !aiResult.code ? 0.5 : 1 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px', padding: '0 22px', backgroundColor: '#E51E4D', color: '#FFFFFF', border: 'none', borderRadius: '8px', cursor: !aiResult.code ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', opacity: !aiResult.code ? 0.5 : 1 }}
                   >
                     <Plus size={16} />
                     Ajouter la marchandise
@@ -1014,7 +1042,7 @@ const NoteForm = () => {
                   <button
                     onClick={() => setSearchTerm(aiResult.code)}
                     disabled={!aiResult.code}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px', padding: '0 18px', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: !aiResult.code ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 500, fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap', opacity: !aiResult.code ? 0.5 : 1 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px', padding: '0 18px', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: !aiResult.code ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap', opacity: !aiResult.code ? 0.5 : 1 }}
                   >
                     Rechercher dans le tarif
                   </button>
@@ -1045,12 +1073,24 @@ const NoteForm = () => {
                 <div><label style={labelStyle}>V. FACTURE CALC.</label><input style={{...inputStyle, backgroundColor: 'var(--bg-primary)', color: 'var(--text-muted)'}} readOnly title="Somme des valeurs FOB des articles" value={valeurs.vFactureCalculee} /></div>
               </div>
               
-              <div className="grid-mobile-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', alignItems: 'end' }}>
+              <div className="grid-mobile-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', alignItems: 'end' }}>
                 <div><label style={labelStyle}>V. FRET</label><input style={inputStyle} name="vFret" type="number" value={valeurs.vFret} onChange={handleValeursChange}/></div>
-                <div></div>
+                <div>
+                  <label style={labelStyle}>Devise Fret</label>
+                  <select style={inputStyle} name="vFretDevise" value={valeurs.vFretDevise} onChange={handleValeursChange}>
+                    {Object.keys(CURRENCY_RATES).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Taux Fret (FCFA)</label>
+                  <input style={inputStyle} name="vFretTaux" type="number" value={valeurs.vFretTaux} onChange={handleValeursChange}/>
+                </div>
+              </div>
+
+              <div className="grid-mobile-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', alignItems: 'end' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <label style={{...labelStyle, marginBottom: 0, whiteSpace: 'nowrap'}}>V. ASSURANCE</label>
+                    <label style={{...labelStyle, marginBottom: 0, whiteSpace: 'nowrap'}}>V. ASSURANCE (FCFA)</label>
                     <select 
                       style={{ background: 'none', border: 'none', padding: 0, margin: 0, fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', cursor: 'pointer', outline: 'none', textAlign: 'right' }}
                       name="modeAssurance"
@@ -1071,23 +1111,37 @@ const NoteForm = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
                   <div><label style={labelStyle}>V. COMISSION</label><input style={inputStyle} name="vCommission" value={valeurs.vCommission} onChange={handleValeursChange}/></div>
                   <div><label style={labelStyle}>V.AJUST</label><input style={inputStyle} name="vTauxAjust" value={valeurs.vTauxAjust} onChange={handleValeursChange}/></div>
-                  <div><label style={labelStyle}>V. FRAIS DIVERS</label><input style={inputStyle} name="vFraisDivers" value={valeurs.vFraisDivers} onChange={handleValeursChange}/></div>
+                  <div className="grid-mobile-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', alignItems: 'end' }}>
+                    <div><label style={labelStyle}>V. FRAIS DIVERS</label><input style={inputStyle} name="vFraisDivers" value={valeurs.vFraisDivers} onChange={handleValeursChange}/></div>
+                    <div>
+                      <label style={labelStyle}>Devise Frais</label>
+                      <select style={inputStyle} name="vFraisDevise" value={valeurs.vFraisDevise} onChange={handleValeursChange}>
+                        {Object.keys(CURRENCY_RATES).map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Taux Frais (FCFA)</label>
+                      <input style={inputStyle} name="vFraisTaux" type="number" value={valeurs.vFraisTaux} onChange={handleValeursChange}/>
+                    </div>
+                  </div>
                 </div>
               </details>
 
               {/* Totaux BLUE BLOCK (Maintenant Dark Theme) */}
               <div style={{ marginTop: '0.5rem', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                  <div>
-                    <div style={{ color: 'var(--accent-primary)', fontWeight: 700, fontSize: '1rem' }}>CAF TOTAL</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Total en {infos.devise}</div>
+                {valeurs.cafDevise !== '' && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                    <div>
+                      <div style={{ color: 'var(--accent-primary)', fontWeight: 700, fontSize: '1rem' }}>CAF TOTAL</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Total en {infos.devise}</div>
+                    </div>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '1.25rem' }}>
+                      {formatNumberWithDots(valeurs.cafDevise, true) || '0.00'}
+                    </div>
                   </div>
-                  <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '1.25rem' }}>
-                    {formatNumberWithDots(valeurs.cafDevise, true) || '0.00'}
-                  </div>
-                </div>
+                )}
                 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: valeurs.cafDevise !== '' ? '1px solid var(--border-color)' : 'none', paddingTop: valeurs.cafDevise !== '' ? '0.75rem' : 0 }}>
                   <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.85rem' }}>Total en CFA</div>
                   <div style={{ color: 'var(--accent-primary)', fontWeight: 800, fontSize: '1.5rem' }}>
                     {formatNumberWithDots(valeurs.cafCFA) || '0'}

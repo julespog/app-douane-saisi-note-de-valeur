@@ -190,7 +190,7 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                   {/* Ligne 8 */}
                   <tr>
                     <td style={darkTdStyle}>
-                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.FRET:</span> <span>{formatWithDots(valeurs.vFret)} {valeurs.vFretDevise || ''}</span></div>
+                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.FRET:</span> <span>{formatWithDots(valeurs.vFret)}</span></div>
                     </td>
                     <td style={thStyle}>Origine</td>
                     {[...Array(5)].map((_, i) => <td key={i} style={{...tdStyle, fontWeight: 'bold'}}>{chunk[i] ? (COUNTRY_CODES[chunk[i].origine] || (chunk[i].origine ? chunk[i].origine.substring(0, 2).toUpperCase() : '')) : ''}</td>)}
@@ -222,7 +222,7 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                   {/* Ligne 12 */}
                   <tr>
                     <td style={darkTdStyle}>
-                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.FRAIS DIVERS:</span> <span>{formatWithDots(valeurs.vFraisDivers)} {valeurs.vFraisDevise || ''}</span></div>
+                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.FRAIS DIVERS:</span> <span>{formatWithDots(valeurs.vFraisDivers)}</span></div>
                     </td>
                     <td style={thStyle}>V. Statistique</td>
                     {[...Array(5)].map((_, i) => <td key={i} style={{...tdStyle, fontWeight: 'bold', backgroundColor: '#f8fafc'}}>{chunk[i] ? formatWithDots(chunk[i].valeurImposable) : ''}</td>)}
@@ -231,7 +231,7 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                   {valeurs.cafDevise !== '' && valeurs.cafDevise !== undefined && (
                     <tr>
                       <td style={{ ...darkTdStyle, backgroundColor: 'white' }}>
-                        <div style={{display: 'flex', justifyContent: 'space-between'}}><span>C.A.F (devise):</span> <span>{formatWithDots(valeurs.cafDevise)}</span></div>
+                        <div style={{display: 'flex', justifyContent: 'space-between'}}><span>C.A.F:</span> <span>{formatWithDots(valeurs.cafDevise)}</span></div>
                       </td>
                       <td colSpan={6} rowSpan={2} style={{ borderTop: tableBorderStyle, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'white' }}></td>
                     </tr>
