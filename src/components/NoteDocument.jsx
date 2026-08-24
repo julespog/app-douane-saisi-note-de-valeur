@@ -198,7 +198,7 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                   {/* Ligne 9 */}
                   <tr>
                     <td style={darkTdStyle}>
-                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.ASSURANCE:</span> <span>{formatWithDots(valeurs.vAssurance)} FCFA</span></div>
+                      <div style={{display: 'flex', justifyContent: 'space-between'}}><span>V.ASSURANCE:</span> <span>{formatWithDots(valeurs.vAssurance)}</span></div>
                     </td>
                     <td style={thStyle}>P. Brut</td>
                     {[...Array(5)].map((_, i) => <td key={i} style={tdStyle}>{chunk[i] ? chunk[i].pBrut : ''}</td>)}
@@ -231,7 +231,7 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
                   {valeurs.cafDevise !== '' && valeurs.cafDevise !== undefined && (
                     <tr>
                       <td style={{ ...darkTdStyle, backgroundColor: 'white' }}>
-                        <div style={{display: 'flex', justifyContent: 'space-between'}}><span>C.A.F:</span> <span>{formatWithDots(valeurs.cafDevise)}</span></div>
+                        <div style={{display: 'flex', justifyContent: 'space-between'}}><span>C.A.F (devise):</span> <span>{formatWithDots(valeurs.cafDevise)}</span></div>
                       </td>
                       <td colSpan={6} rowSpan={2} style={{ borderTop: tableBorderStyle, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'white' }}></td>
                     </tr>
