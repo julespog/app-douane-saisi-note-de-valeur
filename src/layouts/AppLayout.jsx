@@ -2,6 +2,7 @@ import React, { useContext, useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Archive, LogOut, FilePlus, AlertCircle, LayoutDashboard, Cloud, CloudOff, RefreshCw, Download, Eraser, Sun, Moon, GraduationCap } from 'lucide-react';
 import fastLogo from '../assets/fast-logo.png';
+import gnamatechLogo from '../assets/gnamatech-logo-horizontal.png';
 import { UserContext } from '../context/UserContext';
 import { DatabaseContext } from '../context/DatabaseContext';
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -133,11 +134,7 @@ const AppLayout = () => {
       <header className="topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '3rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: 0 }}>
-            <img src={fastLogo} alt="Fast International" style={{ height: '36px', objectFit: 'contain' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--accent-primary)', letterSpacing: '0.5px', lineHeight: '1' }}>GNAMATECH 1.0</span>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>by Fast International</span>
-            </div>
+            <img src={gnamatechLogo} alt="GNAMATECH 1.0" style={{ height: '48px', objectFit: 'contain' }} />
           </div>
 
           <nav className="desktop-only" style={{ display: 'flex', gap: '0.5rem' }}>
