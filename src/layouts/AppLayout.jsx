@@ -1,6 +1,6 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Archive, LogOut, FilePlus, AlertCircle, LayoutDashboard, Cloud, CloudOff, RefreshCw, Download, Eraser, Sun, Moon, GraduationCap } from 'lucide-react';
+import { Archive, LogOut, FilePlus, AlertCircle, LayoutDashboard, Cloud, CloudOff, RefreshCw, Download, Eraser, Sun, Moon, GraduationCap, Monitor } from 'lucide-react';
 import fastLogo from '../assets/fast-logo.png';
 import gnamatechLogo from '../assets/gnamatech-logo-horizontal.png';
 import { UserContext } from '../context/UserContext';
@@ -195,7 +195,41 @@ const AppLayout = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           
-          {/* Install Button */}
+          {/* Windows Desktop Download button (visible only in Web browser) */}
+          {!window.__TAURI__ && (
+            <a
+              href="/downloads/Gnamatech_Setup.exe"
+              download="Gnamatech_Setup.exe"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.4rem 0.8rem',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '20px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                textDecoration: 'none',
+                transition: 'all 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}
+              title="Télécharger l'application PC Windows (.exe) avec mode hors-ligne"
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                e.currentTarget.style.color = 'var(--accent-primary)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-color)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+            >
+              <Monitor size={14} /> <span className="desktop-only">App Windows (.exe)</span>
+            </a>
+          )}
+
+          {/* Install Button PWA */}
           {isInstallable && (
             <button 
               onClick={promptInstall}

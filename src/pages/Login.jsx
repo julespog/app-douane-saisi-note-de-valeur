@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { FileText, Lock, Mail, Download } from 'lucide-react';
+import { FileText, Lock, Mail, Download, Monitor } from 'lucide-react';
 import { UserContext } from '../context/UserContext';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import PDFDownloadProgress from '../components/PDFDownloadProgress';
@@ -115,9 +115,45 @@ const Login = () => {
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#059669'}
               onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
             >
-              <Download size={20} /> Installer l'application
+              <Download size={20} /> Installer l'application Web
             </button>
           )}
+
+          <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+            <a 
+              href="/downloads/Gnamatech_Setup.exe" 
+              download="Gnamatech_Setup.exe"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.6rem',
+                padding: '0.8rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)',
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: '0.92rem',
+                transition: 'all 0.2s',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                e.currentTarget.style.color = 'var(--accent-primary)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-color)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+            >
+              <Monitor size={18} /> Télécharger pour Windows (.exe)
+            </a>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+              Application native avec mode hors-ligne complet & documentation intégrée
+            </div>
+          </div>
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
