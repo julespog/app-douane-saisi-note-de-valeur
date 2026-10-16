@@ -1011,7 +1011,8 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
 
             {(aiResult.code || aiResult.explanation) && !aiLoading && (
               <div style={{ marginTop: '16px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.25rem 1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
+                {/* Ligne du haut : Code SH, Taux DD et Image */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
                   <div style={{ flexShrink: 0 }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.35rem' }}>Code SH proposé</div>
                     <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--accent-primary)', fontFamily: 'monospace', letterSpacing: '1.5px' }}>{aiResult.code || '—'}</div>
@@ -1024,28 +1025,20 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                       </div>
                     </div>
                   )}
-                  {aiResult.libelle && (
-                    <div style={{ flex: '1 1 240px', minWidth: '220px', paddingLeft: '1.25rem', borderLeft: '1px solid var(--border-color)' }}>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.35rem' }}>Libellé officiel de la marchandise</div>
-                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                        {aiResult.libelle}
-                      </div>
-                    </div>
-                  )}
                   {aiResult.imageUrl && (
-                    <>
+                    <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
                       <div
                         onClick={() => setAiImageZoomed(true)}
                         title="Cliquer pour agrandir"
-                        style={{ flexShrink: 0, width: '140px', height: '100px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-tertiary)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'zoom-in', position: 'relative' }}
+                        style={{ width: '130px', height: '90px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-tertiary)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'zoom-in', position: 'relative' }}
                       >
                         <img
                           src={aiResult.imageUrl}
                           alt={aiQuery || "Produit"}
                           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                          onError={(e) => { if (e.currentTarget?.parentElement) e.currentTarget.parentElement.style.display = 'none'; }}
+                          onError={(e) => { if (e.currentTarget?.parentElement?.parentElement) e.currentTarget.parentElement.parentElement.style.display = 'none'; }}
                         />
-                        <div style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.55)', borderRadius: '4px', padding: '2px 5px', fontSize: '0.65rem', color: '#fff', pointerEvents: 'none' }}>🔍 Agrandir</div>
+                        <div style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', padding: '2px 5px', fontSize: '0.65rem', color: '#fff', pointerEvents: 'none' }}>🔍 Agrandir</div>
                       </div>
                       {aiImageZoomed && (
                         <div
@@ -1066,18 +1059,19 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                           </div>
                         </div>
                       )}
-                    </>
-                  )}
-
-                  {aiResult.explanation && (
-                    <div style={{ flex: 1, minWidth: '200px' }}>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.35rem' }}>Description détaillée</div>
-                      <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: '1.6' }} className="markdown-container">
-                        <ReactMarkdown>{aiResult.explanation}</ReactMarkdown>
-                      </div>
                     </div>
                   )}
                 </div>
+
+                {/* Section centrale : Description détaillée sur toute la largeur */}
+                {aiResult.explanation && (
+                  <div style={{ width: '100%' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Description détaillée</div>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: '1.6' }} className="markdown-container">
+                      <ReactMarkdown>{aiResult.explanation}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button
