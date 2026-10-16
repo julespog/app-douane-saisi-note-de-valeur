@@ -20,7 +20,13 @@ const CustomPDFViewer = ({ url, file, search }) => {
         const response = await fetch(encodeURI(baseUrl));
         if (!response.ok) throw new Error('Network response was not ok');
         
-        const blob = await response.blob();
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) {
+          throw new Error('Received HTML instead of PDF');
+        }
+
+        const buffer = await response.arrayBuffer();
+        const blob = new Blob([buffer], { type: 'application/pdf' });
         
         objectUrl = URL.createObjectURL(blob);
         setBlobUrl(objectUrl);
@@ -55,7 +61,7 @@ const CustomPDFViewer = ({ url, file, search }) => {
   }
 
   return (
-    <div style={{ width: '100%', height: '80vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f1f5f9', position: 'relative' }}>
+    <div style={{ width: '100%', height: '100%', minHeight: '600px', display: 'flex', flexDirection: 'column', backgroundColor: '#f1f5f9', position: 'relative' }}>
       {loading && (
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#64748b' }}>
           Chargement du document...

@@ -47,8 +47,7 @@ const Login = () => {
         boxShadow: 'var(--shadow-lg)'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <img src={fastLogo} alt="FAST Logo" style={{ height: '48px', marginBottom: '0.2rem', objectFit: 'contain' }} />
-          <h2 style={{ fontSize: '1.3rem', fontWeight: 900, margin: '0 0 1.5rem 0', color: 'var(--accent-primary)', letterSpacing: '1px', textTransform: 'uppercase' }}>GNAMATECH 1.0</h2>
+          <img src={fastLogo} alt="FAST Logo" style={{ height: '220px', marginBottom: '1.5rem', objectFit: 'contain' }} />
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>Espace Sécurisé</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
             Connectez-vous pour accéder à vos outils déclaratifs

@@ -87,8 +87,9 @@ const NoteForm = () => {
 
   // AI product search state
   const [aiQuery, setAiQuery] = useState('');
-  const [aiResult, setAiResult] = useState({ code: '', explanation: '' });
+  const [aiResult, setAiResult] = useState({ code: '', libelle: '', explanation: '', taux: '', imageUrl: '', model: '' });
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiImageZoomed, setAiImageZoomed] = useState(false);
 
 
   // Nouveau state pour l'article en cours d'ajout
@@ -742,7 +743,7 @@ const NoteForm = () => {
           <Save size={18}/> Sauvegarder
         </button>
         
-        <button className="premium-btn-secondary" style={{ marginLeft: '1rem' }} onClick={() => setPdfViewerDoc('/DOCUMENTATION S DOUANE/Code des Douanes Gabonais/Code des douanes harmonisé_final).pdf')}>
+        <button className="premium-btn-secondary" style={{ marginLeft: '1rem' }} onClick={() => setPdfViewerDoc('/DOCUMENTATION S DOUANE/Code des Douanes Gabonais/Code_des_Douanes.pdf')}>
           <BookOpen size={18}/> Code Douanes
         </button>
         <button className="premium-btn-secondary" onClick={() => setPdfViewerDoc('/DOCUMENTATION S DOUANE/Reglementation Douaniere/REGLEMENTATION DOUANIERE-CEMAC.pdf')}>
@@ -909,35 +910,49 @@ const NoteForm = () => {
                 onClick={() => {
                   if (!aiQuery.trim()) return;
                   setAiLoading(true);
-                  setAiResult({ code: '', explanation: '' });
+                  setAiResult({ code: '', libelle: '', explanation: '', taux: '', imageUrl: '' });
                   const prompt = `En tant qu'expert strict en nomenclature douanière de la CEMAC (spécifiquement pour le Gabon), analyse le produit suivant : "${aiQuery}".
 ⚠️ RÈGLE ABSOLUE : Tes résultats doivent se baser UNIQUEMENT sur le Tarif Extérieur Commun (TEC) de la CEMAC et la réglementation du Gabon. Ne cite AUCUNE autre législation étrangère (comme l'UE ou le Canada).
-Fournis le code SH CEMAC (à 8 chiffres) le plus pertinent.
+Fournis :
+1. Le code SH CEMAC (à 8 chiffres) le plus pertinent.
+2. Le vrai libellé tarifaire officiel du produit selon la nomenclature douanière CEMAC (ATTENTION : Ne reprends JAMAIS textuellement les mots-clés de recherche saisis par l'utilisateur, mais formule le VRAI libellé tarifaire officiel tel qu'il doit figurer sur la déclaration en douane).
+3. Le taux de Droit de Douane (DD) applicable selon les 4 catégories CEMAC (Catégorie 1: 5%, Catégorie 2: 10%, Catégorie 3: 20%, Catégorie 4: 30%).
+4. L'explication détaillée en Markdown.
 IMPORTANT: Utilise du Markdown pour structurer ta réponse (titres ###, gras, puces).
-Structure ta réponse en 2 parties claires :
-1. Le Code SH CEMAC (justification selon les règles, et alternatives possibles à 8 chiffres).
+Structure ta réponse en parties claires :
+1. Le Code SH CEMAC, le Libellé officiel et le Taux de Droit de Douane (DD : 5%, 10%, 20% ou 30%).
 2. Description détaillée du produit et des critères de classement.
-Tu dois répondre avec un objet JSON valide contenant exactement ces 2 clés : "code" et "explanation". L'explication doit contenir le markdown.`;
+Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
+"code" : code à 8 chiffres (ex: "87032110")
+"libelle" : vrai libellé tarifaire officiel CEMAC (ex: "Voitures de tourisme à moteur à essence, d'une cylindrée n'excédant pas 1000 cm3")
+"taux" : taux DD (ex: "30%")
+"explanation" : explication en Markdown`;
                   fetch('/api/ai', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt })
+                    body: JSON.stringify({ prompt: prompt, query: aiQuery })
                   })
                   .then(async r => {
-                    if (r.status === 429) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Quota dépassé (429): ${errBody.substring(0, 100)}` }); return; }
-                    if (!r.ok) { const errBody = await r.text(); setAiResult({ code: '', explanation: `❌ Erreur ${r.status}: ${errBody.substring(0, 200)}` }); return; }
+                    if (r.status === 429) { const errBody = await r.text(); setAiResult({ code: '', libelle: '', explanation: `❌ Quota dépassé (429): ${errBody.substring(0, 100)}`, imageUrl: '' }); return; }
+                    if (!r.ok) { const errBody = await r.text(); setAiResult({ code: '', libelle: '', explanation: `❌ Erreur ${r.status}: ${errBody.substring(0, 200)}`, imageUrl: '' }); return; }
                     const data = await r.json();
                     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    const foundImage = data?.imageUrl || '';
+                    const usedModel = data?.model || '';
                     supabase.from('ai_queries').insert({ company_id: user?.companyId || user?.company_id, user_id: user?.id, query: aiQuery, response: text }).then(({ error }) => { if (error) console.error('AI log error:', error); }).catch(err => console.error('AI log catch:', err));
-                    if (!text) { setAiResult({ code: '', explanation: '❌ Réponse vide de l\'API Gemini' }); return; }
+                    if (!text) { setAiResult({ code: '', libelle: '', explanation: '❌ Réponse vide de l\'API Gemini', imageUrl: '', model: '' }); return; }
 
                     let parsedCode = '';
+                    let parsedLibelle = '';
+                    let parsedTaux = '';
                     let parsedExplanation = text;
                     const jsonMatch = text.match(/\{[\s\S]*\}/);
                     if (jsonMatch) {
                       try {
                         const parsed = JSON.parse(jsonMatch[0]);
                         parsedCode = parsed.code || '';
+                        parsedLibelle = parsed.libelle || '';
+                        parsedTaux = parsed.taux || '';
                         parsedExplanation = parsed.explanation || text;
                       } catch { /* ignore */ }
                     }
@@ -965,12 +980,19 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 2 clés : "
                           parsedExplanation = parsedExplanation.replace(new RegExp(parsedCode, 'g'), realCode);
                         }
                         parsedCode = realCode;
+                        if (keys.descKey && match[keys.descKey]) {
+                          parsedLibelle = String(match[keys.descKey]).trim() || parsedLibelle;
+                        }
+                        if (keys.tauxKey && match[keys.tauxKey] !== undefined) {
+                          const rawT = String(match[keys.tauxKey]).replace(/[^0-9.]/g, '');
+                          if (rawT) parsedTaux = `${rawT}%`;
+                        }
                       }
                     }
 
-                    setAiResult({ code: parsedCode, explanation: parsedExplanation });
+                    setAiResult({ code: parsedCode, libelle: parsedLibelle, taux: parsedTaux, explanation: parsedExplanation, imageUrl: foundImage, model: usedModel });
                   })
-                  .catch((err) => setAiResult({ code: '', explanation: `Erreur réseau : ${err.message}` }))
+                  .catch((err) => setAiResult({ code: '', libelle: '', explanation: `Erreur réseau : ${err.message}`, imageUrl: '', model: '' }))
                   .finally(() => setAiLoading(false));
                 }}
                 disabled={aiLoading}
@@ -980,7 +1002,7 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 2 clés : "
                 {aiLoading ? 'Recherche en cours…' : 'Trouver le code SH'}
               </button>
               <button
-                onClick={() => { setAiQuery(''); setAiResult({ code: '', explanation: '', taux: '' }); }}
+                onClick={() => { setAiQuery(''); setAiResult({ code: '', libelle: '', explanation: '', taux: '', imageUrl: '', model: '' }); }}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '48px', padding: '0 20px', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 500, whiteSpace: 'nowrap' }}
               >
                 Effacer
@@ -994,6 +1016,59 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 2 clés : "
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.35rem' }}>Code SH proposé</div>
                     <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--accent-primary)', fontFamily: 'monospace', letterSpacing: '1.5px' }}>{aiResult.code || '—'}</div>
                   </div>
+                  {aiResult.taux && (
+                    <div style={{ flexShrink: 0, paddingLeft: '1.25rem', borderLeft: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.35rem' }}>Droit de Douane (DD)</div>
+                      <div style={{ fontWeight: 800, fontSize: '1.4rem', color: '#10B981', fontFamily: 'monospace', letterSpacing: '1px' }}>
+                        {aiResult.taux.includes('%') ? aiResult.taux : `${aiResult.taux}%`}
+                      </div>
+                    </div>
+                  )}
+                  {aiResult.libelle && (
+                    <div style={{ flex: '1 1 240px', minWidth: '220px', paddingLeft: '1.25rem', borderLeft: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.35rem' }}>Libellé officiel de la marchandise</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                        {aiResult.libelle}
+                      </div>
+                    </div>
+                  )}
+                  {aiResult.imageUrl && (
+                    <>
+                      <div
+                        onClick={() => setAiImageZoomed(true)}
+                        title="Cliquer pour agrandir"
+                        style={{ flexShrink: 0, width: '140px', height: '100px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-tertiary)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'zoom-in', position: 'relative' }}
+                      >
+                        <img
+                          src={aiResult.imageUrl}
+                          alt={aiQuery || "Produit"}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          onError={(e) => { if (e.currentTarget?.parentElement) e.currentTarget.parentElement.style.display = 'none'; }}
+                        />
+                        <div style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.55)', borderRadius: '4px', padding: '2px 5px', fontSize: '0.65rem', color: '#fff', pointerEvents: 'none' }}>🔍 Agrandir</div>
+                      </div>
+                      {aiImageZoomed && (
+                        <div
+                          onClick={() => setAiImageZoomed(false)}
+                          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
+                        >
+                          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+                            <img
+                              src={aiResult.imageUrl}
+                              alt={aiQuery || "Produit"}
+                              style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 8px 40px rgba(0,0,0,0.7)', display: 'block' }}
+                            />
+                            <div style={{ textAlign: 'center', color: '#fff', marginTop: '10px', fontSize: '0.9rem', opacity: 0.8 }}>{aiQuery || "Produit"}</div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setAiImageZoomed(false); }}
+                              style={{ position: 'absolute', top: '-14px', right: '-14px', background: '#E51E4D', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#fff', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}
+                            >✕</button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   {aiResult.explanation && (
                     <div style={{ flex: 1, minWidth: '200px' }}>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.35rem' }}>Description détaillée</div>
@@ -1003,49 +1078,92 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 2 clés : "
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                  <button
-                    onClick={() => {
-                      if (aiResult.code && tariffs.length > 0) {
-                        const keys = getTariffDisplay(tariffs[0]);
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => {
+                        if (!aiResult.code) return;
                         const cleanCode = aiResult.code.replace(/[\s.]/g, '');
-                        let match = tariffs.find(t => {
-                          const code = String(t[keys.codeSHKey] || '').replace(/[\s.]/g, '');
-                          const cemac = keys.cemacKey ? String(t[keys.cemacKey] || '').replace(/[\s.]/g, '') : '';
-                          return (code + cemac).padEnd(8, '0').substring(0, 8) === cleanCode;
-                        });
-                        if (!match && cleanCode.length >= 6) {
-                          const clean6 = cleanCode.substring(0, 6);
+                        let match = null;
+                        let keys = {};
+                        if (typeof tariffs !== 'undefined' && tariffs.length > 0) {
+                          keys = getTariffDisplay(tariffs[0]);
                           match = tariffs.find(t => {
                             const code = String(t[keys.codeSHKey] || '').replace(/[\s.]/g, '');
-                            return code.substring(0, 6) === clean6;
+                            const cemac = keys.cemacKey ? String(t[keys.cemacKey] || '').replace(/[\s.]/g, '') : '';
+                            return (code + cemac).padEnd(8, '0').substring(0, 8) === cleanCode;
                           });
+                          if (!match && cleanCode.length >= 6) {
+                            const clean6 = cleanCode.substring(0, 6);
+                            match = tariffs.find(t => {
+                              const code = String(t[keys.codeSHKey] || '').replace(/[\s.]/g, '');
+                              return code.substring(0, 6) === clean6;
+                            });
+                          }
                         }
-                        if (match) selectTariff(match);
-                        else {
-                          setNewArticle({
-                            id: Date.now(), codeSH: cleanCode, intitule: aiQuery || '',
-                            tauxDD: '0', unite: 'KGM', origine: infos.provenance || 'NC',
-                            quantite: '1', valeur: '', pBrut: '', pNet: '', colis: '1', codeAdditionnel: '000',
-                          });
-                        }
-                        setAiResult({ code: '', explanation: '' });
+
+                        // Libellé officiel : base tarif, ou libellé IA officiel, JAMAIS les mots-clés aiQuery
+                        const finalLibelle = (match && keys.descKey && match[keys.descKey]) || aiResult.libelle || 'Marchandise diverse';
+                        const finalTaux = (match && keys.tauxKey && match[keys.tauxKey] !== undefined ? String(match[keys.tauxKey]).replace(/[^0-9.]/g, '') : '') || (aiResult.taux || '0').replace(/[^0-9.]/g, '');
+                        const finalUnite = (match && keys.uniteKey && match[keys.uniteKey]) || 'KGM';
+
+                        setNewArticle({
+                          id: Date.now(),
+                          codeSH: cleanCode,
+                          intitule: finalLibelle,
+                          tauxDD: finalTaux || '0',
+                          unite: finalUnite,
+                          origine: infos.provenance || 'NC',
+                          quantite: '1',
+                          valeur: '',
+                          pBrut: '',
+                          pNet: '',
+                          colis: '1',
+                          codeAdditionnel: '000',
+                        });
+
+                        setAiResult({ code: '', libelle: '', explanation: '', taux: '', imageUrl: '', model: '' });
                         setAiQuery('');
-                      }
-                    }}
-                    disabled={!aiResult.code}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px', padding: '0 22px', backgroundColor: '#E51E4D', color: '#FFFFFF', border: 'none', borderRadius: '8px', cursor: !aiResult.code ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', opacity: !aiResult.code ? 0.5 : 1 }}
-                  >
-                    <Plus size={16} />
-                    Ajouter la marchandise
-                  </button>
-                  <button
-                    onClick={() => setSearchTerm(aiResult.code)}
-                    disabled={!aiResult.code}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px', padding: '0 18px', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: !aiResult.code ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap', opacity: !aiResult.code ? 0.5 : 1 }}
-                  >
-                    Rechercher dans le tarif
-                  </button>
+
+                        setTimeout(() => {
+                          const el = document.getElementById('articles-section') || document.querySelector('[name="valeur"]');
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 100);
+                      }}
+                      disabled={!aiResult.code}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px', padding: '0 22px', backgroundColor: '#E51E4D', color: '#FFFFFF', border: 'none', borderRadius: '8px', cursor: !aiResult.code ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', opacity: !aiResult.code ? 0.5 : 1 }}
+                    >
+                      <Plus size={16} />
+                      Ajouter la marchandise
+                    </button>
+                    <button
+                      onClick={() => setSearchTerm(aiResult.code)}
+                      disabled={!aiResult.code}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px', padding: '0 18px', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: !aiResult.code ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap', opacity: !aiResult.code ? 0.5 : 1 }}
+                    >
+                      Rechercher dans le tarif
+                    </button>
+                  </div>
+
+                  {aiResult.model && (
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.72rem',
+                        color: 'var(--text-muted)',
+                        backgroundColor: 'var(--bg-primary)',
+                        border: '1px solid var(--border-color)',
+                        padding: '4px 10px',
+                        borderRadius: '20px'
+                      }}
+                      title={`Réponse fournie par le modèle ${aiResult.model}`}
+                    >
+                      <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981' }}></span>
+                      <span>Modèle d'IA : <strong style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{aiResult.model}</strong></span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

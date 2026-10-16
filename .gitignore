@@ -36,3 +36,6 @@ move_search.cjs
 test_pdf.js
 upload_tariff.mjs
 update_ui.cjs
+*.tar.gz
+download_storage.mjs
+supabase_files/

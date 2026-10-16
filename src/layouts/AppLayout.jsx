@@ -134,7 +134,7 @@ const AppLayout = () => {
       <header className="topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '3rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: 0 }}>
-            <img src={gnamatechLogo} alt="GNAMATECH 1.0" style={{ height: '48px', objectFit: 'contain' }} />
+            <img src={gnamatechLogo} alt="GNAMATECH 1.0" style={{ height: '85px', objectFit: 'contain' }} />
           </div>
 
           <nav className="desktop-only" style={{ display: 'flex', gap: '0.5rem' }}>

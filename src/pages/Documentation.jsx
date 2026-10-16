@@ -105,7 +105,7 @@ const Documentation = () => {
     setActiveSection('code');
     setSelectedFile({
       name: "Code des douanes harmonisé_final).pdf",
-      url: "/DOCUMENTATION S DOUANE/Code des Douanes Gabonais/Code des douanes harmonisé_final).pdf"
+      url: "/DOCUMENTATION S DOUANE/Code des Douanes Gabonais/Code_des_Douanes.pdf"
     });
   };
 

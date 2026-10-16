@@ -193,7 +193,7 @@ body {
 }
 
 .topbar {
-  height: 54px;
+  height: 94px;
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   display: flex;
@@ -262,7 +262,7 @@ input[type=number] {
 
   .topbar {
     padding: 0 1rem;
-    height: 50px;
+    height: 80px;
   }
 
   .content-scrollable {
