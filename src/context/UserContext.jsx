@@ -15,18 +15,23 @@ export const UserProvider = ({ children }) => {
       const savedUser = localStorage.getItem('fast_session');
       if (savedUser) {
         const parsedUser = JSON.parse(savedUser);
-        // Toujours rafraîchir les données de l'entreprise au chargement
-        const { data: companies } = await supabase.from('companies').select('*');
-        if (companies && parsedUser.companyId) {
-          const comp = companies.find(c => c.id === parsedUser.companyId);
-          if (comp) {
-            parsedUser.company = {
-              ...comp,
-              footer_text: comp.legal_info?.footer_text || '',
-              legalInfo: comp.legal_info,
-              subscription: { status: comp.subscription_status, endDate: comp.subscription_end_date }
-            };
+        try {
+          if (navigator.onLine) {
+            const { data: companies } = await supabase.from('companies').select('*');
+            if (companies && parsedUser.companyId) {
+              const comp = companies.find(c => c.id === parsedUser.companyId);
+              if (comp) {
+                parsedUser.company = {
+                  ...comp,
+                  footer_text: comp.legal_info?.footer_text || '',
+                  legalInfo: comp.legal_info,
+                  subscription: { status: comp.subscription_status, endDate: comp.subscription_end_date }
+                };
+              }
+            }
           }
+        } catch (e) {
+          console.warn("Offline: using cached company data", e);
         }
         setUser(parsedUser);
       }
@@ -224,12 +229,45 @@ export const UserProvider = ({ children }) => {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanPassword = (password || '').trim();
     
-    const { data: users, error } = await supabase.from('users')
-      .select('*, companies(*)')
-      .eq('email', cleanEmail)
-      .eq('password', cleanPassword);
+    // Support de la session hors-ligne si l'utilisateur s'est déjà connecté au moins une fois
+    const savedUserStr = localStorage.getItem('fast_session');
+    if (!navigator.onLine && savedUserStr) {
+      try {
+        const savedUser = JSON.parse(savedUserStr);
+        if (savedUser.email?.trim().toLowerCase() === cleanEmail) {
+          setUser(savedUser);
+          return savedUser;
+        }
+      } catch (e) {}
+      throw new Error("Vous êtes hors-ligne. Veuillez vous connecter au moins une fois avec une connexion internet.");
+    }
+    
+    let users = null;
+    let error = null;
+    try {
+      const res = await supabase.from('users')
+        .select('*, companies(*)')
+        .eq('email', cleanEmail)
+        .eq('password', cleanPassword);
+      users = res.data;
+      error = res.error;
+    } catch (err) {
+      error = err;
+    }
       
-    if (error) throw new Error("Erreur de connexion.");
+    if (error) {
+      // Si une session existe en local, permettre la connexion hors-ligne en secours
+      if (savedUserStr) {
+        try {
+          const savedUser = JSON.parse(savedUserStr);
+          if (savedUser.email?.trim().toLowerCase() === cleanEmail) {
+            setUser(savedUser);
+            return savedUser;
+          }
+        } catch (e) {}
+      }
+      throw new Error("Erreur de connexion au serveur (" + (error.message || 'Réseau indisponible') + "). Vérifiez votre connexion internet.");
+    }
     
     if (users && users.length > 0) {
       const foundUser = users[0];

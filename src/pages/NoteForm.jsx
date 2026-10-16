@@ -927,7 +927,8 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
 "libelle" : vrai libellé tarifaire officiel CEMAC (ex: "Voitures de tourisme à moteur à essence, d'une cylindrée n'excédant pas 1000 cm3")
 "taux" : taux DD (ex: "30%")
 "explanation" : explication en Markdown`;
-                  fetch('/api/ai', {
+                  const apiBase = (typeof window !== 'undefined' && (window.__TAURI__ || window.location.origin.includes('localhost') || window.location.origin.includes('tauri'))) ? 'https://gnamatech.com' : '';
+                  fetch(`${apiBase}/api/ai`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt: prompt, query: aiQuery })
@@ -937,7 +938,8 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                     if (!r.ok) { const errBody = await r.text(); setAiResult({ code: '', libelle: '', explanation: `❌ Erreur ${r.status}: ${errBody.substring(0, 200)}`, imageUrl: '' }); return; }
                     const data = await r.json();
                     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                    const foundImage = data?.imageUrl || '';
+                    const rawImage = data?.imageUrl || '';
+                    const foundImage = rawImage && !rawImage.startsWith('http') ? `${apiBase}${rawImage}` : rawImage;
                     const usedModel = data?.model || '';
                     supabase.from('ai_queries').insert({ company_id: user?.companyId || user?.company_id, user_id: user?.id, query: aiQuery, response: text }).then(({ error }) => { if (error) console.error('AI log error:', error); }).catch(err => console.error('AI log catch:', err));
                     if (!text) { setAiResult({ code: '', libelle: '', explanation: '❌ Réponse vide de l\'API Gemini', imageUrl: '', model: '' }); return; }
