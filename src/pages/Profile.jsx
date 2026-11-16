@@ -1,12 +1,16 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { CreditCard, Lock, Upload, FileText, Database, CheckCircle } from 'lucide-react';
+import { CreditCard, Lock, Upload, FileText, Database, CheckCircle, Building } from 'lucide-react';
 import { UserContext } from '../context/UserContext';
 import { DatabaseContext } from '../context/DatabaseContext';
 
 const Profile = () => {
-  const { user, profileLogo, changePassword } = useContext(UserContext);
+  const { user, profileLogo, changePassword, updateCompany } = useContext(UserContext);
   const { documents, uploadDocument } = useContext(DatabaseContext);
   const [activeTab, setActiveTab] = useState('documents');
+
+  const [companyLogo, setCompanyLogo] = useState(user?.company?.logo || null);
+  const [isSavingLogo, setIsSavingLogo] = useState(false);
+  const [logoSuccess, setLogoSuccess] = useState(false);
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -24,9 +28,38 @@ const Profile = () => {
     if (user?.role === 'superadmin') {
       setActiveTab('securite');
     } else {
-      setActiveTab('abonnement');
+      setActiveTab('entreprise');
+    }
+    if (user?.company?.logo) {
+      setCompanyLogo(user.company.logo);
     }
   }, [user]);
+
+  const handleLogoFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setCompanyLogo(event.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveCompanyLogo = async () => {
+    if (!user?.companyId) return;
+    setIsSavingLogo(true);
+    setLogoSuccess(false);
+    try {
+      await updateCompany(user.companyId, { logo: companyLogo });
+      setLogoSuccess(true);
+      setTimeout(() => setLogoSuccess(false), 4000);
+    } catch (err) {
+      alert("Erreur lors de l'enregistrement du logo: " + err.message);
+    } finally {
+      setIsSavingLogo(false);
+    }
+  };
 
   const handleFileUpload = async (key, e) => {
     if (e.target.files && e.target.files[0]) {
@@ -61,6 +94,7 @@ const Profile = () => {
   ];
 
   const declarantTabs = [
+    { id: 'entreprise', label: 'Mon Entreprise & Logo', icon: <Building size={18} /> },
     { id: 'abonnement', label: 'Mon Abonnement', icon: <CreditCard size={18} /> },
     { id: 'securite', label: 'Sécurité & Mot de passe', icon: <Lock size={18} /> }
   ];
@@ -106,6 +140,89 @@ const Profile = () => {
           {/* --- ADMIN VIEWS (Removed obsolete ones) --- */}
 
           {/* --- DECLARANT VIEWS --- */}
+          {activeTab === 'entreprise' && user?.role === 'declarant' && (
+            <div style={cardStyle}>
+              <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: 'var(--accent-primary)' }}>
+                Informations & Logo de l'Entreprise
+              </h2>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '500px' }}>
+                <div style={{ padding: '1rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                    {user?.company?.name || 'Mon Entreprise'}
+                  </div>
+                  {user?.company?.legalInfo?.nif && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>NIF : {user.company.legalInfo.nif}</div>
+                  )}
+                  {user?.company?.legalInfo?.rccm && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>RCCM : {user.company.legalInfo.rccm}</div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Logo officiel pour vos notes de détail</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginTop: '0.5rem' }}>
+                    <div style={{ 
+                      width: '120px', height: '80px', borderRadius: '8px', border: '2px dashed var(--border-color)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff',
+                      overflow: 'hidden', padding: '4px'
+                    }}>
+                      {companyLogo && !companyLogo.includes('cjxramixzefbrsaweuoz') ? (
+                        <img src={companyLogo} alt="Logo Entreprise" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                      ) : (
+                        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem' }}>
+                          <Building size={24} style={{ margin: '0 auto 4px auto' }} />
+                          Aucun logo
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <input 
+                        type="file" 
+                        accept="image/png, image/jpeg, image/jpg" 
+                        id="logo-upload-input" 
+                        style={{ display: 'none' }} 
+                        onChange={handleLogoFileChange}
+                      />
+                      <label 
+                        htmlFor="logo-upload-input" 
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                          padding: '0.6rem 1rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                          borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)'
+                        }}
+                      >
+                        <Upload size={16} /> Choisir une image
+                      </label>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+                        Format PNG ou JPEG
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {logoSuccess && (
+                  <div style={{ padding: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px', color: 'var(--success)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <CheckCircle size={16} /> Logo enregistré avec succès ! Il apparaîtra sur toutes vos prochaines notes.
+                  </div>
+                )}
+
+                <button 
+                  onClick={handleSaveCompanyLogo}
+                  disabled={isSavingLogo}
+                  style={{
+                    padding: '0.75rem 1.5rem', backgroundColor: 'var(--accent-primary)', color: 'white',
+                    border: 'none', borderRadius: '6px', fontWeight: 600, cursor: isSavingLogo ? 'not-allowed' : 'pointer',
+                    opacity: isSavingLogo ? 0.7 : 1, width: 'fit-content'
+                  }}
+                >
+                  {isSavingLogo ? 'Enregistrement en cours...' : 'Enregistrer le logo'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'abonnement' && user?.role === 'declarant' && (
              <div style={cardStyle}>
                <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: 'var(--accent-primary)' }}>Abonnement de l'Entreprise</h2>

@@ -64,9 +64,16 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
               <div style={{ textAlign: 'center', marginBottom: '20px', position: 'relative' }}>
                 {company && (
                   <div style={{ position: 'absolute', top: '0', left: '0', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px', maxWidth: '250px' }}>
-                    {company.logo && <img src={company.logo} alt="Logo" style={{ height: '45px', objectFit: 'contain' }} />}
+                    {company.logo && !company.logo.includes('cjxramixzefbrsaweuoz') ? (
+                      <img 
+                        src={company.logo} 
+                        alt="Logo" 
+                        style={{ height: '45px', objectFit: 'contain' }} 
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    ) : null}
                     <div style={{ fontSize: '9px', lineHeight: '1.3', color: '#475569' }}>
-                      {!company.logo && <div style={{ fontWeight: 'bold', fontSize: '11px', color: '#0f172a', marginBottom: '2px' }}>{company.name}</div>}
+                      <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#0f172a', marginBottom: '2px', textTransform: 'uppercase' }}>{company.name}</div>
                       {company.legalInfo?.nif && <div>NIF: {company.legalInfo.nif}</div>}
                       {company.legalInfo?.rccm && <div>RCCM: {company.legalInfo.rccm}</div>}
                     </div>
@@ -259,10 +266,15 @@ const NoteDocument = ({ articles = [], infos = {}, valeurs = {}, company = null,
               {/* HEADER PAGES SUIVANTES */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '15px' }}>
                 <div style={{ width: '150px' }}>
-                  {company?.logo ? (
-                    <img src={company.logo} alt="Logo" style={{ width: '90px', height: 'auto', maxHeight: '50px', objectFit: 'contain' }} />
+                  {company?.logo && !company.logo.includes('cjxramixzefbrsaweuoz') ? (
+                    <img 
+                      src={company.logo} 
+                      alt="Logo" 
+                      style={{ width: '90px', height: 'auto', maxHeight: '50px', objectFit: 'contain' }} 
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
                   ) : (
-                    <div style={{ fontWeight: 'bold', fontSize: '12px' }}>{company?.name || ''}</div>
+                    <div style={{ fontWeight: 'bold', fontSize: '12px', textTransform: 'uppercase' }}>{company?.name || ''}</div>
                   )}
                 </div>
                 <div style={{ textAlign: 'center', flex: 1 }}>

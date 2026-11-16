@@ -228,10 +228,55 @@ export const UserProvider = ({ children }) => {
   const login = async (email, password) => {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanPassword = (password || '').trim();
-    
-    // Support de la session hors-ligne si l'utilisateur s'est déjà connecté au moins une fois
     const savedUserStr = localStorage.getItem('fast_session');
-    if (!navigator.onLine && savedUserStr) {
+
+    let users = null;
+    let networkError = null;
+
+    try {
+      // 1. Tenter la connexion en ligne avec un timeout de 8 secondes
+      const queryPromise = supabase.from('users')
+        .select('*, companies(*)')
+        .eq('email', cleanEmail)
+        .eq('password', cleanPassword);
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Délai d\'attente dépassé (serveur injoignable)')), 8000)
+      );
+
+      const res = await Promise.race([queryPromise, timeoutPromise]);
+      users = res.data;
+      if (res.error) networkError = res.error;
+    } catch (err) {
+      networkError = err;
+    }
+
+    // 2. Si le serveur a répondu
+    if (!networkError && users !== null) {
+      if (users.length > 0) {
+        const foundUser = users[0];
+        const { password: _, companies, company_id, ...sessionUser } = foundUser;
+        sessionUser.companyId = company_id;
+        
+        if (companies) {
+          sessionUser.company = {
+            ...companies,
+            footer_text: companies.legal_info?.footer_text || '',
+            legalInfo: companies.legal_info,
+            subscription: { status: companies.subscription_status, endDate: companies.subscription_end_date }
+          };
+        }
+        
+        setUser(sessionUser);
+        localStorage.setItem('fast_session', JSON.stringify(sessionUser));
+        return sessionUser;
+      }
+      // Identifiants non trouvés sur le serveur
+      throw new Error("Identifiants incorrects. Vérifiez l'adresse email et le mot de passe.");
+    }
+
+    // 3. Si le réseau est injoignable (hors-ligne), vérifier si une session locale existe
+    if (savedUserStr) {
       try {
         const savedUser = JSON.parse(savedUserStr);
         if (savedUser.email?.trim().toLowerCase() === cleanEmail) {
@@ -239,56 +284,10 @@ export const UserProvider = ({ children }) => {
           return savedUser;
         }
       } catch (e) {}
-      throw new Error("Vous êtes hors-ligne. Veuillez vous connecter au moins une fois avec une connexion internet.");
     }
-    
-    let users = null;
-    let error = null;
-    try {
-      const res = await supabase.from('users')
-        .select('*, companies(*)')
-        .eq('email', cleanEmail)
-        .eq('password', cleanPassword);
-      users = res.data;
-      error = res.error;
-    } catch (err) {
-      error = err;
-    }
-      
-    if (error) {
-      // Si une session existe en local, permettre la connexion hors-ligne en secours
-      if (savedUserStr) {
-        try {
-          const savedUser = JSON.parse(savedUserStr);
-          if (savedUser.email?.trim().toLowerCase() === cleanEmail) {
-            setUser(savedUser);
-            return savedUser;
-          }
-        } catch (e) {}
-      }
-      throw new Error("Erreur de connexion au serveur (" + (error.message || 'Réseau indisponible') + "). Vérifiez votre connexion internet.");
-    }
-    
-    if (users && users.length > 0) {
-      const foundUser = users[0];
-      const { password: _, companies, company_id, ...sessionUser } = foundUser;
-      sessionUser.companyId = company_id;
-      
-      if (companies) {
-        sessionUser.company = {
-          ...companies,
-          footer_text: companies.legal_info?.footer_text || '',
-          legalInfo: companies.legal_info,
-          subscription: { status: companies.subscription_status, endDate: companies.subscription_end_date }
-        };
-      }
-      
-      setUser(sessionUser);
-      localStorage.setItem('fast_session', JSON.stringify(sessionUser));
-      return sessionUser;
-    }
-    
-    throw new Error("Identifiants incorrects. Vérifiez l'adresse email et le mot de passe.");
+
+    // 4. Aucun réseau et aucune session locale enregistrée
+    throw new Error("Impossible de joindre le serveur (" + (networkError?.message || 'Réseau indisponible') + "). Une première connexion avec internet est nécessaire.");
   };
 
   const logout = () => {

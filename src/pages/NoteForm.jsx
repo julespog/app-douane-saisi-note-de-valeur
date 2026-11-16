@@ -10,7 +10,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import NoteDocument from '../components/NoteDocument';
 import { DatabaseContext } from '../context/DatabaseContext';
 import { UserContext } from '../context/UserContext';
-import { supabase } from '../supabaseClient';
+import { supabase, customFetch } from '../supabaseClient';
 import CustomPDFViewer from '../components/CustomPDFViewer';
 import { distributeTotals } from '../utils/weightDistribution';
 import ReactMarkdown from 'react-markdown';
@@ -928,7 +928,7 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
 "taux" : taux DD (ex: "30%")
 "explanation" : explication en Markdown`;
                   const apiBase = (typeof window !== 'undefined' && (window.__TAURI__ || window.location.origin.includes('localhost') || window.location.origin.includes('tauri'))) ? 'https://gnamatech.com' : '';
-                  fetch(`${apiBase}/api/ai`, {
+                  customFetch(`${apiBase}/api/ai`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt: prompt, query: aiQuery })

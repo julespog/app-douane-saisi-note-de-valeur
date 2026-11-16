@@ -6,6 +6,16 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "http:default",
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [
+        { "url": "https://gnamatech.com/*" },
+        { "url": "https://www.gnamatech.com/*" },
+        { "url": "https://*/*" },
+        { "url": "http://*/*" }
+      ]
+    }
   ]
 }
