@@ -48,6 +48,16 @@ const FileTreeNode = ({ node, onSelectFile, selectedUrl, forceOpen = false }) =>
   );
 };
 
+// Un document est un PDF si son nom OU son URL se termine par .pdf.
+// Les documents importés par l'admin ont un titre libre sans extension
+// (ex. « Arrêté N°12 ») mais leur fichier stocké est toujours un .pdf.
+const isPdfFile = (file) => {
+  if (!file) return false;
+  if (file.isCustom) return true; // l'admin n'accepte que des PDF
+  const clean = (s) => String(s || '').split(/[?#]/)[0].toLowerCase();
+  return clean(file.name).endsWith('.pdf') || clean(file.url).endsWith('.pdf');
+};
+
 const Documentation = () => {
   const [tree, setTree] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -201,7 +211,7 @@ const Documentation = () => {
 
   const getViewerUrl = () => {
     if (!selectedFile) return null;
-    if (selectedFile.name.endsWith('.pdf')) {
+    if (isPdfFile(selectedFile)) {
       return searchTerm ? `${selectedFile.url}#search=${encodeURIComponent(searchTerm)}` : selectedFile.url;
     }
     return selectedFile.url;
@@ -317,7 +327,7 @@ const Documentation = () => {
             {selectedFile ? selectedFile.name : 'Sélectionnez un document pour l\'afficher'}
           </h3>
           
-          {selectedFile && selectedFile.name.endsWith('.pdf') && (
+          {selectedFile && isPdfFile(selectedFile) && (
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <div style={{ position: 'relative', width: '250px' }}>
                 <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -348,7 +358,7 @@ const Documentation = () => {
         {/* Viewer Area */}
         <div style={{ flex: 1, backgroundColor: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
           {selectedFile ? (
-            selectedFile.name.endsWith('.pdf') ? (
+            isPdfFile(selectedFile) ? (
               <CustomPDFViewer file={getViewerUrl()} />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', backgroundColor: 'var(--bg-secondary)' }}>
