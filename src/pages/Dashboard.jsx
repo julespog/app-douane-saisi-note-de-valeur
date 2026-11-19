@@ -340,10 +340,14 @@ const Dashboard = () => {
       message: `Voulez-vous vraiment supprimer "${doc.name}" ? Il sera retiré de la documentation pour tous les utilisateurs.`,
       onConfirm: async () => {
         try {
+          // Retirer d'abord l'entrée de la liste (c'est elle que voient les utilisateurs),
+          // puis le fichier. Supabase ne lève pas d'exception : il faut lire `error`.
+          const { error: deleteErr } = await supabase.from('custom_documents').delete().eq('id', doc.id);
+          if (deleteErr) throw deleteErr;
           if (doc.file_path) {
-            await supabase.storage.from('documents').remove([doc.file_path]);
+            const { error: removeErr } = await supabase.storage.from('documents').remove([doc.file_path]);
+            if (removeErr) console.warn("Fichier non supprimé du stockage :", removeErr);
           }
-          await supabase.from('custom_documents').delete().eq('id', doc.id);
           setCustomAlert({ type: 'success', message: "Document supprimé." });
           await fetchCustomDocs();
         } catch (e) {

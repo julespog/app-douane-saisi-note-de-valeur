@@ -140,15 +140,19 @@ const Documentation = () => {
             .select('*')
             .order('created_at', { ascending: false });
 
-          let docsToMerge = customDocs;
-          if (customDocs && customDocs.length > 0) {
+          let docsToMerge;
+          if (!error && Array.isArray(customDocs)) {
+            // Le serveur a répondu : sa liste fait foi, même vide (documents supprimés
+            // par l'administrateur). On remplace le cache hors-ligne par cette liste.
+            docsToMerge = customDocs;
             localStorage.setItem('cached_custom_documents', JSON.stringify(customDocs));
           } else {
+            // Serveur injoignable (hors-ligne) : on utilise la dernière liste connue.
             const cached = localStorage.getItem('cached_custom_documents');
-            if (cached) docsToMerge = JSON.parse(cached);
+            docsToMerge = cached ? JSON.parse(cached) : [];
           }
 
-          if (docsToMerge && docsToMerge.length > 0) {
+          if (docsToMerge.length > 0) {
             setTree(mergeCustomDocsIntoTree(data, docsToMerge));
           } else {
             setTree(data);
