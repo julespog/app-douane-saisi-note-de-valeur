@@ -95,6 +95,20 @@ const NoteForm = () => {
   // Nouveau state pour l'article en cours d'ajout
   const [newArticle, setNewArticle] = useState(null);
 
+  // Sépare la section « Règles de classification » du reste de l'explication IA,
+  // pour l'afficher et l'imprimer dans son propre bloc.
+  const splitClassificationRules = (markdown) => {
+    const text = String(markdown || '');
+    const heading = /^\s*#{1,6}\s*(?:\d+[.)]\s*)?\**\s*R[èeé]gles?\s+(?:g[ée]n[ée]rales\s+)?(?:de\s+classification|de\s+classement|interpr[ée]tatives)[^\n]*$/im;
+    const m = heading.exec(text);
+    if (!m) return { description: text.trim(), regles: '' };
+    let description = text.slice(0, m.index).trim();
+    const regles = text.slice(m.index + m[0].length).trim();
+    // Retire le titre « Description détaillée » (déjà affiché comme intitulé de bloc)
+    description = description.replace(/^\s*#{1,6}\s*(?:\d+[.)]\s*)?\**\s*Description d[ée]taill[ée]e[^\n]*\n?/i, '').trim();
+    return { description, regles };
+  };
+
   const handlePrintAiResult = () => {
     if (!aiResult.code && !aiResult.explanation) return;
     document.body.classList.add('printing-ai-result');
@@ -926,16 +940,18 @@ Fournis :
 1. Le code SH CEMAC (à 8 chiffres) le plus pertinent.
 2. Le vrai libellé tarifaire officiel du produit selon la nomenclature douanière CEMAC (ATTENTION : Ne reprends JAMAIS textuellement les mots-clés de recherche saisis par l'utilisateur, mais formule le VRAI libellé tarifaire officiel tel qu'il doit figurer sur la déclaration en douane).
 3. Le taux de Droit de Douane (DD) applicable selon les 4 catégories CEMAC (Catégorie 1: 5%, Catégorie 2: 10%, Catégorie 3: 20%, Catégorie 4: 30%).
-4. L'explication détaillée en Markdown.
+4. L'explication détaillée en Markdown, qui DOIT contenir les Règles de classification appliquées.
 IMPORTANT: Utilise du Markdown pour structurer ta réponse (titres ###, gras, puces).
-Structure ta réponse en parties claires :
-1. Le Code SH CEMAC, le Libellé officiel et le Taux de Droit de Douane (DD : 5%, 10%, 20% ou 30%).
-2. Description détaillée du produit et des critères de classement.
+Le champ "explanation" doit contenir EXACTEMENT ces deux sections, dans cet ordre, avec ces titres :
+### Description détaillée
+Description détaillée du produit (nature, composition, usage) et critères de classement dans la position retenue.
+### Règles de classification
+Liste à puces des Règles Générales Interprétatives (RGI) du Système Harmonisé effectivement appliquées pour aboutir à ce code (ex : RGI 1, RGI 3 a), RGI 6), ainsi que les Notes de Section ou de Chapitre pertinentes. Pour chaque règle : son numéro, son énoncé résumé, et en une phrase pourquoi elle s'applique à ce produit. Sois concis (5 puces au maximum).
 Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
 "code" : code à 8 chiffres (ex: "87032110")
 "libelle" : vrai libellé tarifaire officiel CEMAC (ex: "Voitures de tourisme à moteur à essence, d'une cylindrée n'excédant pas 1000 cm3")
 "taux" : taux DD (ex: "30%")
-"explanation" : explication en Markdown`;
+"explanation" : les deux sections Markdown ci-dessus ("### Description détaillée" puis "### Règles de classification")`;
                   const apiBase = (typeof window !== 'undefined' && (window.__TAURI__ || window.location.origin.includes('localhost') || window.location.origin.includes('tauri'))) ? 'https://gnamatech.com' : '';
                   customFetch(`${apiBase}/api/ai`, {
                     method: 'POST',
@@ -1001,7 +1017,8 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                       }
                     }
 
-                    setAiResult({ code: parsedCode, libelle: parsedLibelle, taux: parsedTaux, explanation: parsedExplanation, imageUrl: foundImage, model: usedModel });
+                    const { description, regles } = splitClassificationRules(parsedExplanation);
+                    setAiResult({ code: parsedCode, libelle: parsedLibelle, taux: parsedTaux, explanation: description, regles, imageUrl: foundImage, model: usedModel });
                   })
                   .catch((err) => setAiResult({ code: '', libelle: '', explanation: `Erreur réseau : ${err.message}`, imageUrl: '', model: '' }))
                   .finally(() => setAiLoading(false));
@@ -1080,6 +1097,16 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Description détaillée</div>
                     <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: '1.6' }} className="markdown-container">
                       <ReactMarkdown>{aiResult.explanation}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+
+                {/* Règles de classification appliquées (RGI) */}
+                {aiResult.regles && (
+                  <div style={{ width: '100%', marginTop: '1rem', padding: '0.9rem 1rem', backgroundColor: 'var(--bg-tertiary)', borderLeft: '3px solid var(--accent-primary)', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Règles de classification</div>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: '1.6' }} className="markdown-container">
+                      <ReactMarkdown>{aiResult.regles}</ReactMarkdown>
                     </div>
                   </div>
                 )}
@@ -1247,14 +1274,26 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                     )}
                   </div>
 
-                  {/* Justification technique et notes explicatives */}
+                  {/* Description détaillée du produit */}
                   {aiResult.explanation && (
                     <div style={{ marginBottom: '24px' }}>
                       <div style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: '6px', marginBottom: '12px', letterSpacing: '0.5px' }}>
-                        Justification Technique & Notes Explicatives de Classement
+                        Description détaillée
                       </div>
                       <div style={{ fontSize: '12px', color: '#1e293b', lineHeight: '1.7', textAlign: 'justify' }} className="markdown-container">
                         <ReactMarkdown>{aiResult.explanation}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Règles de classification appliquées */}
+                  {aiResult.regles && (
+                    <div style={{ marginBottom: '24px', breakInside: 'avoid' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: '6px', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                        Règles de classification
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#1e293b', lineHeight: '1.7', textAlign: 'justify', borderLeft: '3px solid #2563eb', paddingLeft: '12px' }} className="markdown-container">
+                        <ReactMarkdown>{aiResult.regles}</ReactMarkdown>
                       </div>
                     </div>
                   )}
