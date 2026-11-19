@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { safeEncodePath } from '../components/CustomPDFViewer';
 
 // Global state outside the hook to persist across navigation
 let globalIsDownloading = false;
@@ -50,7 +51,7 @@ export const usePDFDownloader = () => {
           if (node.type === 'directory') {
             extractUrls(node.children);
           } else if (node.type === 'file' && node.name.toLowerCase().endsWith('.pdf')) {
-            pdfUrls.push(encodeURI(node.url));
+            pdfUrls.push(safeEncodePath(node.url));
           }
         }
       };

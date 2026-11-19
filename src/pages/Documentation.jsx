@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Book, FileText, Search, Folder, ChevronRight, ChevronDown, File, Download } from 'lucide-react';
-import CustomPDFViewer from '../components/CustomPDFViewer';
+import CustomPDFViewer, { safeEncodePath } from '../components/CustomPDFViewer';
 import { usePDFDownloader } from '../hooks/usePDFDownloader';
+import { supabase } from '../supabaseClient';
 
 const FileTreeNode = ({ node, onSelectFile, selectedUrl }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,7 +19,8 @@ const FileTreeNode = ({ node, onSelectFile, selectedUrl }) => {
         >
           {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           <Folder size={18} color="var(--accent-primary)" />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={node.name}>{node.name}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={node.name}>{node.name}</span>
+          {node.isCustom && <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--accent-primary)', color: 'white', padding: '1px 6px', borderRadius: '4px', marginLeft: 'auto' }}>Admin</span>}
         </div>
         {isOpen && (
           <div style={{ paddingLeft: '1.5rem', marginTop: '4px', borderLeft: '2px solid var(--border-color)', marginLeft: '0.75rem' }}>
@@ -37,7 +39,8 @@ const FileTreeNode = ({ node, onSelectFile, selectedUrl }) => {
       onMouseOut={e => !isSelected && (e.currentTarget.style.backgroundColor = 'transparent')}
     >
       <File size={16} />
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={node.name}>{node.name}</span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={node.name}>{node.name}</span>
+      {node.isCustom && <span style={{ fontSize: '0.65rem', backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : '#10b981', color: 'white', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>Admin</span>}
     </div>
   );
 };
@@ -74,7 +77,6 @@ const Documentation = () => {
     return nodes.map(node => {
       if (node.type === 'directory') {
         const filteredChildren = filterTree(node.children, term);
-        // Si un enfant matche OU si le nom du dossier matche
         if (filteredChildren.length > 0 || node.name.toLowerCase().includes(lowerTerm)) {
           return { ...node, children: filteredChildren };
         }
@@ -88,11 +90,79 @@ const Documentation = () => {
 
   const displayedTree = filterTree(tree, globalSearchTerm);
 
+  const mergeCustomDocsIntoTree = (baseTree, customDocs) => {
+    if (!customDocs || customDocs.length === 0) return baseTree;
+    const treeCopy = JSON.parse(JSON.stringify(baseTree));
+
+    customDocs.forEach(doc => {
+      const targetCategory = (doc.category || 'Autres Documents').trim();
+      let foundDir = treeCopy.find(node => node.type === 'directory' && node.name.toLowerCase() === targetCategory.toLowerCase());
+
+      const customFileNode = {
+        name: doc.name,
+        type: 'file',
+        path: `custom/${doc.id}/${doc.name}`,
+        url: doc.file_url,
+        size: doc.file_size || 0,
+        isCustom: true,
+        id: doc.id
+      };
+
+      if (foundDir) {
+        if (!foundDir.children) foundDir.children = [];
+        if (!foundDir.children.some(c => c.url === doc.file_url || c.name === doc.name)) {
+          foundDir.children.unshift(customFileNode);
+        }
+      } else {
+        treeCopy.push({
+          name: targetCategory,
+          type: 'directory',
+          path: `custom_dir/${targetCategory}`,
+          isCustom: true,
+          children: [customFileNode]
+        });
+      }
+    });
+
+    return treeCopy;
+  };
+
   useEffect(() => {
     fetch('/manifest_docs.json')
       .then(res => res.json())
-      .then(data => {
-        setTree(data);
+      .then(async data => {
+        try {
+          const { data: customDocs, error } = await supabase
+            .from('custom_documents')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          let docsToMerge = customDocs;
+          if (customDocs && customDocs.length > 0) {
+            localStorage.setItem('cached_custom_documents', JSON.stringify(customDocs));
+          } else {
+            const cached = localStorage.getItem('cached_custom_documents');
+            if (cached) docsToMerge = JSON.parse(cached);
+          }
+
+          if (docsToMerge && docsToMerge.length > 0) {
+            setTree(mergeCustomDocsIntoTree(data, docsToMerge));
+          } else {
+            setTree(data);
+          }
+        } catch (err) {
+          console.warn("Échec chargement documents distants, tentative cache local :", err);
+          const cached = localStorage.getItem('cached_custom_documents');
+          if (cached) {
+            try {
+              setTree(mergeCustomDocsIntoTree(data, JSON.parse(cached)));
+            } catch {
+              setTree(data);
+            }
+          } else {
+            setTree(data);
+          }
+        }
         setIsLoading(false);
       })
       .catch(err => {
@@ -254,7 +324,7 @@ const Documentation = () => {
                 />
               </div>
               <a 
-                href={encodeURI(selectedFile.url)} 
+                href={safeEncodePath(selectedFile.url)} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 title="Ouvrir dans le navigateur externe"
@@ -279,7 +349,7 @@ const Documentation = () => {
                 <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem', fontSize: '1.25rem', fontWeight: 600 }}>{selectedFile.name}</h3>
                 <p style={{ marginBottom: '2rem', fontSize: '0.95rem' }}>Ce format de fichier ({selectedFile.name.split('.').pop()}) ne peut pas être lu directement dans le navigateur.</p>
                 <a 
-                  href={selectedFile.url} 
+                  href={safeEncodePath(selectedFile.url)} 
                   download 
                   className="premium-btn"
                   style={{ textDecoration: 'none' }}

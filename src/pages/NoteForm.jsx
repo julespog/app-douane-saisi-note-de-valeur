@@ -95,6 +95,15 @@ const NoteForm = () => {
   // Nouveau state pour l'article en cours d'ajout
   const [newArticle, setNewArticle] = useState(null);
 
+  const handlePrintAiResult = () => {
+    if (!aiResult.code && !aiResult.explanation) return;
+    document.body.classList.add('printing-ai-result');
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove('printing-ai-result');
+    }, 1000);
+  };
+
   // Lecteur PDF rapide (Code Douane / Reglementation)
   const [pdfViewerDoc, setPdfViewerDoc] = useState(null);
 
@@ -1139,6 +1148,15 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                     >
                       Rechercher dans le tarif
                     </button>
+                    <button
+                      onClick={handlePrintAiResult}
+                      disabled={!aiResult.code && !aiResult.explanation}
+                      title="Imprimer cette fiche d'expertise tarifaire IA"
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px', padding: '0 18px', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: (!aiResult.code && !aiResult.explanation) ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap', opacity: (!aiResult.code && !aiResult.explanation) ? 0.5 : 1 }}
+                    >
+                      <Printer size={16} />
+                      Imprimer l'analyse
+                    </button>
                   </div>
 
                   {aiResult.model && (
@@ -1160,6 +1178,96 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                       <span>Modèle d'IA : <strong style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{aiResult.model}</strong></span>
                     </div>
                   )}
+                </div>
+
+                {/* FICHE IMPRIMABLE D'EXPERTISE IA (Masquée à l'écran, active lors de l'impression) */}
+                <div id="ai-printable-sheet" style={{ display: 'none' }}>
+                  <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: '12px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                        GNAMATECH — ASSISTANCE TARIF & DOUANE
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                        Zone Douanière CEMAC • Système Harmonisé 2022
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: '11px', color: '#475569' }}>
+                      <div><strong>Date d'édition :</strong> {new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                      <div><strong>Opérateur :</strong> {user?.name || 'Déclarant'} ({user?.company?.name || 'Gnamatech'})</div>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'center', margin: '20px 0 24px 0' }}>
+                    <h1 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      FICHE D'EXPERTISE TARIFAIRE ET CLASSEMENT DOUANIER
+                    </h1>
+                    {aiQuery && (
+                      <div style={{ fontSize: '13px', color: '#334155', fontStyle: 'italic', backgroundColor: '#f8fafc', padding: '6px 12px', borderRadius: '6px', display: 'inline-block', border: '1px solid #cbd5e1' }}>
+                        Marchandise / Requête analysée : <strong>« {aiQuery} »</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Encadré principal des résultats tarifaires */}
+                  <div style={{ display: 'flex', gap: '20px', alignItems: 'stretch', marginBottom: '20px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '16px', backgroundColor: '#f8fafc' }}>
+                    <div style={{ flex: 1, borderRight: '1px solid #cbd5e1', paddingRight: '20px' }}>
+                      <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
+                        Code Système Harmonisé (SH) Proposé
+                      </div>
+                      <div style={{ fontSize: '26px', fontWeight: 800, color: '#2563eb', fontFamily: 'monospace', letterSpacing: '2px' }}>
+                        {aiResult.code || '—'}
+                      </div>
+                      {aiResult.libelle && (
+                        <div style={{ fontSize: '12px', color: '#334155', marginTop: '4px', fontWeight: 600 }}>
+                          {aiResult.libelle}
+                        </div>
+                      )}
+                    </div>
+
+                    {aiResult.taux && (
+                      <div style={{ flex: 1, paddingLeft: '10px' }}>
+                        <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
+                          Droit de Douane Applicable (DD)
+                        </div>
+                        <div style={{ fontSize: '26px', fontWeight: 800, color: '#059669', fontFamily: 'monospace', letterSpacing: '1px' }}>
+                          {aiResult.taux.includes('%') ? aiResult.taux : `${aiResult.taux}%`}
+                        </div>
+                        {aiResult.model && (
+                          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                            Modèle d'IA : <strong>{aiResult.model}</strong>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {aiResult.imageUrl && (
+                      <div style={{ width: '120px', height: '90px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1', flexShrink: 0 }}>
+                        <img src={aiResult.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Justification technique et notes explicatives */}
+                  {aiResult.explanation && (
+                    <div style={{ marginBottom: '24px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: '6px', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                        Justification Technique & Notes Explicatives de Classement
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#1e293b', lineHeight: '1.7', textAlign: 'justify' }} className="markdown-container">
+                        <ReactMarkdown>{aiResult.explanation}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bas de page officiel */}
+                  <div style={{ marginTop: '30px', paddingTop: '12px', borderTop: '1px solid #cbd5e1', fontSize: '10px', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      Assistance au classement tarifaire conformément au tarif des douanes harmonisé CEMAC 2022.
+                    </div>
+                    <div>
+                      Généré via la plateforme Gnamatech
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

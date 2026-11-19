@@ -1,5 +1,8 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { Building, Users, UserPlus, Edit3, Trash2, CheckCircle, Plus, ChevronLeft, Save, X, FileText, RefreshCw } from 'lucide-react';
+import { 
+  Building, Users, UserPlus, Edit3, Trash2, CheckCircle, Plus, ChevronLeft, Save, X, 
+  FileText, RefreshCw, Upload, Folder, Eye, Download, BookOpen 
+} from 'lucide-react';
 import { UserContext } from '../context/UserContext';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -21,15 +24,38 @@ const Modal = ({ isOpen, onClose, title, children }) => {
   );
 };
 
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes === 0) return '0 Ko';
+  const k = 1024;
+  const sizes = ['Octets', 'Ko', 'Mo', 'Go'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
 const Dashboard = () => {
   const { user, getCompanies, getUsers, createCompany, updateCompany, createUser, removeUser, renewSubscription } = useContext(UserContext);
   const navigate = useNavigate();
+
+  // Navigation tab : 'companies' ou 'documents'
+  const [mainTab, setMainTab] = useState('companies');
 
   const [companies, setCompanies] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [notesStats, setNotesStats] = useState({}); // { companyId: { total, monthly } }
   const [aiStats, setAiStats] = useState({}); // { companyId: { total, monthly } }
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Custom documentation states
+  const [customDocs, setCustomDocs] = useState([]);
+  const [docLoading, setDocLoading] = useState(false);
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [newDocData, setNewDocData] = useState({
+    name: '',
+    category: 'Note de Service et Arretes Douane',
+    customCategory: '',
+    file: null
+  });
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -53,6 +79,7 @@ const Dashboard = () => {
       return;
     }
     refreshData();
+    fetchCustomDocs();
   }, [user]);
 
   const refreshData = async () => {
@@ -104,95 +131,183 @@ const Dashboard = () => {
     }
   };
 
-  const handleCompanyLogoUpload = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setEditCompany({...editCompany, logo: event.target.result});
-      };
-      reader.readAsDataURL(e.target.files[0]);
-    }
-  };
-
-  const handleLegalInfoChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'name') {
-      setEditCompany({ ...editCompany, name: value });
-    } else {
-      setEditCompany({
-        ...editCompany,
-        legalInfo: { ...editCompany.legalInfo, [name]: value }
-      });
-    }
-  };
-
-  const saveCompanyInfos = async () => {
+  const fetchCustomDocs = async () => {
+    setDocLoading(true);
     try {
-      await updateCompany(selectedCompany.id, { 
-        name: editCompany.name, 
-        legalInfo: editCompany.legalInfo || {}, 
-        logo: editCompany.logo,
-        footer_text: editCompany.footer_text || ''
-      });
-      alert("Informations de l'entreprise mises à jour !");
-      await refreshData();
-      setSelectedCompany({ ...selectedCompany, name: editCompany.name, legalInfo: editCompany.legalInfo, logo: editCompany.logo, footer_text: editCompany.footer_text });
-      setIsDetailsModalOpen(false);
-    } catch (e) {
-      alert(e.message);
-    }
-  };
-
-  const handleAddCompanySubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await createCompany({ 
-        name: editCompany.name, 
-        legalInfo: editCompany.legalInfo, 
-        logo: editCompany.logo,
-        footer_text: editCompany.footer_text || '' 
-      });
-      await refreshData();
-      setIsAddModalOpen(false);
-      alert("Entreprise ajoutée avec succès !");
+      const { data, error } = await supabase
+        .from('custom_documents')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setCustomDocs(data || []);
     } catch (err) {
-      alert(err.message);
+      console.error("Erreur chargement documents :", err);
+    } finally {
+      setDocLoading(false);
     }
   };
 
-  const openAddModal = () => {
-    setEditCompany({ name: '', legalInfo: { nif: '', rccm: '', email: '', phone: '', address: '' }, logo: null, footer_text: '' });
-    setIsAddModalOpen(true);
+  const handleUploadDoc = async (e) => {
+    e.preventDefault();
+    if (!newDocData.file || !newDocData.name.trim()) {
+      setCustomAlert({ type: 'error', message: 'Veuillez saisir un titre et sélectionner un fichier PDF.' });
+      return;
+    }
+
+    const file = newDocData.file;
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      setCustomAlert({ type: 'error', message: 'Seuls les fichiers PDF sont acceptés.' });
+      return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      setCustomAlert({ type: 'error', message: 'Le fichier dépasse la taille maximale autorisée (50 Mo).' });
+      return;
+    }
+
+    const finalCategory = newDocData.category === '__custom__'
+      ? (newDocData.customCategory.trim() || 'Autres Documents')
+      : newDocData.category;
+
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `custom/${Date.now()}_${cleanFileName}`;
+
+    try {
+      setIsUploadingDoc(true);
+      const { data: uploadRes, error: uploadErr } = await supabase.storage
+        .from('documents')
+        .upload(storagePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('documents')
+        .getPublicUrl(storagePath);
+
+      const { error: insertErr } = await supabase
+        .from('custom_documents')
+        .insert([{
+          name: newDocData.name.trim(),
+          category: finalCategory,
+          file_url: publicUrl,
+          file_path: storagePath,
+          file_size: file.size
+        }]);
+
+      if (insertErr) throw insertErr;
+
+      setCustomAlert({ 
+        type: 'success', 
+        message: 'Document douanier ajouté avec succès ! Il apparaît immédiatement dans la documentation.' 
+      });
+      setIsDocModalOpen(false);
+      setNewDocData({ name: '', category: 'Note de Service et Arretes Douane', customCategory: '', file: null });
+      await fetchCustomDocs();
+    } catch (err) {
+      console.error("Erreur lors de l'upload du document :", err);
+      setCustomAlert({ type: 'error', message: err.message || "Erreur lors du téléversement du document." });
+    } finally {
+      setIsUploadingDoc(false);
+    }
   };
 
-  const openCompanyDetails = (comp) => {
-    setSelectedCompany(comp);
-    setEditCompany({
-      name: comp.name,
-      legalInfo: comp.legalInfo || { nif: '', rccm: '', email: '', phone: '', address: '' },
-      logo: comp.logo || null,
-      footer_text: comp.footer_text || ''
+  const handleDeleteDocClick = (doc) => {
+    setCustomAlert({
+      type: 'confirm',
+      title: "Supprimer ce document",
+      message: `Voulez-vous vraiment supprimer "${doc.name}" ? Il sera retiré de la documentation pour tous les utilisateurs.`,
+      onConfirm: async () => {
+        try {
+          if (doc.file_path) {
+            await supabase.storage.from('documents').remove([doc.file_path]);
+          }
+          await supabase.from('custom_documents').delete().eq('id', doc.id);
+          setCustomAlert({ type: 'success', message: "Document supprimé." });
+          await fetchCustomDocs();
+        } catch (e) {
+          setCustomAlert({ type: 'error', message: e.message || "Erreur lors de la suppression." });
+        }
+      },
+      onCancel: () => setCustomAlert(null)
     });
+  };
+
+  const handleOpenDetails = (comp) => {
+    setSelectedCompany(comp);
+    setEditCompany({ ...comp, settings: { ...comp.settings } });
     setActiveSubTab('infos');
     setIsDetailsModalOpen(true);
   };
 
-  const handleRenewSubscriptionClick = (comp = selectedCompany) => {
-    setSelectedCompany(comp);
+  const handleSaveCompanyDetails = async () => {
+    try {
+      await updateCompany(editCompany);
+      await refreshData();
+      setSelectedCompany(editCompany);
+      setCustomAlert({ type: 'success', message: "Modifications enregistrées avec succès." });
+    } catch (e) {
+      setCustomAlert({ type: 'error', message: e.message });
+    }
+  };
+
+  const handleRenewClick = () => {
     setRenewDays(30);
     setRenewModalOpen(true);
   };
 
-  const submitRenewSubscription = async () => {
-    if (!isNaN(renewDays) && renewDays !== '') {
+  const submitRenewal = async () => {
+    try {
+      await renewSubscription(selectedCompany.id, parseInt(renewDays, 10));
+      await refreshData();
+      const updated = (await getCompanies()).find(c => c.id === selectedCompany.id);
+      setSelectedCompany(updated);
+      setEditCompany(updated);
+      setRenewModalOpen(false);
+      setCustomAlert({ type: 'success', message: `Abonnement prolongé de ${renewDays} jours.` });
+    } catch (e) {
+      setCustomAlert({ type: 'error', message: e.message });
+    }
+  };
+
+  const openAddModal = () => {
+    setEditCompany({
+      name: '',
+      nif: '',
+      address: '',
+      phone: '',
+      email: '',
+      logo: '',
+      subscription: {
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + 30*24*60*60*1000).toISOString()
+      },
+      settings: {
+        declarationType: 'importation',
+        cleDouane: '',
+        cleCentre: '',
+        regimeDouanier: '4000',
+        bureauDouane: 'GA001',
+        paysOrigine: 'GA',
+        paysProvenance: 'GA',
+        typeColis: 'CT',
+        codeAdditionnel: '000',
+        deviseParDefaut: 'EUR',
+        tauxAssuranceParDefaut: '0.5'
+      }
+    });
+    setIsAddModalOpen(true);
+  };
+
+  const submitCreateCompany = async () => {
+    if (editCompany.name && editCompany.email) {
       try {
-        await renewSubscription(selectedCompany.id, parseInt(renewDays));
-        setCustomAlert({ type: 'success', message: "Abonnement modifié avec succès !" });
-        setRenewModalOpen(false);
+        await createCompany(editCompany);
         await refreshData();
-        const companiesData = await getCompanies();
-        const updated = companiesData.find(c => c.id === selectedCompany.id);
-        if(updated) setSelectedCompany(updated);
+        setIsAddModalOpen(false);
+        setCustomAlert({ type: 'success', message: "Entreprise ajoutée avec succès." });
       } catch (e) {
         setCustomAlert({ type: 'error', message: e.message });
       }
@@ -252,281 +367,593 @@ const Dashboard = () => {
 
   return (
     <div className="fade-in" style={{ padding: '2rem 0', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '2rem' }}>Tableau de Bord Administrateur</h1>
+      <h1 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1.5rem' }}>Tableau de Bord Administrateur</h1>
 
-      {/* KPI Cards */}
-      <div className="grid-mobile-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', marginBottom: '2.5rem' }}>
-        <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ padding: '1rem', borderRadius: '50%', backgroundColor: 'rgba(59, 130, 246, 0.1)' }}>
-            <Building size={24} color="var(--accent-primary)" />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Entreprises Actives</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{activeCompaniesCount}</div>
-          </div>
-        </div>
+      {/* Superadmin Tab Navigation */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+        <button
+          onClick={() => setMainTab('companies')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.6rem',
+            padding: '0.75rem 1.25rem',
+            borderRadius: '8px',
+            border: 'none',
+            backgroundColor: mainTab === 'companies' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+            color: mainTab === 'companies' ? 'white' : 'var(--text-secondary)',
+            fontWeight: 600,
+            fontSize: '0.95rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: mainTab === 'companies' ? '0 4px 6px -1px rgba(59, 130, 246, 0.3)' : 'none'
+          }}
+        >
+          <Building size={18} />
+          Entreprises & Déclarants
+        </button>
         
-        <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ padding: '1rem', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
-            <Users size={24} color="var(--success)" />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Déclarants Enregistrés</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{totalUsersCount}</div>
-          </div>
-        </div>
+        <button
+          onClick={() => { setMainTab('documents'); fetchCustomDocs(); }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.6rem',
+            padding: '0.75rem 1.25rem',
+            borderRadius: '8px',
+            border: 'none',
+            backgroundColor: mainTab === 'documents' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+            color: mainTab === 'documents' ? 'white' : 'var(--text-secondary)',
+            fontWeight: 600,
+            fontSize: '0.95rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: mainTab === 'documents' ? '0 4px 6px -1px rgba(59, 130, 246, 0.3)' : 'none'
+          }}
+        >
+          <BookOpen size={18} />
+          Documentation Douanière
+          {customDocs.length > 0 && (
+            <span style={{ backgroundColor: mainTab === 'documents' ? 'rgba(255,255,255,0.25)' : 'var(--accent-primary)', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
+              {customDocs.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Tableau des entreprises */}
-      <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '2rem', boxShadow: 'var(--shadow-sm)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--accent-primary)' }}>Liste des Entreprises</h2>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              onClick={async () => { setIsRefreshing(true); await refreshData(); setIsRefreshing(false); }}
-              title="Actualiser les statistiques"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--bg-primary)'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-            >
-              <RefreshCw size={15} style={{ animation: isRefreshing ? 'spin 0.8s linear infinite' : 'none' }} />
-              {isRefreshing ? 'Actualisation...' : 'Actualiser'}
-            </button>
-            <button onClick={openAddModal} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}>
-              <Plus size={16} /> Ajouter une Entreprise
-            </button>
-          </div>
-        </div>
-        
-        <div className="table-responsive-wrapper">
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-            <thead>
-             <tr style={{ backgroundColor: 'var(--bg-tertiary)', borderBottom: '2px solid var(--border-color)' }}>
-              <th style={{ padding: '0.75rem 1rem' }}>Nom de l'entreprise</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Agents</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Notes ce mois</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Notes total</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>IA ce mois</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>IA total</th>
-              <th style={{ padding: '0.75rem 1rem' }}>Abonnement</th>
-              <th style={{ padding: '0.75rem 1rem' }}>NIF</th>
-            </tr>
-          </thead>
-          <tbody>
-            {companies.filter(c => c.id !== 'c_admin').map(comp => {
-              const daysRemaining = Math.ceil((new Date(comp.subscription?.endDate || Date.now()) - new Date()) / (1000 * 60 * 60 * 24));
-              const isActive = daysRemaining > 0;
-              const compUsersCount = allUsers.filter(u => u.companyId === comp.id && u.role === 'declarant').length;
-              return (
-                <tr key={comp.id} onClick={() => openCompanyDetails(comp)} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s', cursor: 'pointer' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='var(--bg-tertiary)'} onMouseOut={e=>e.currentTarget.style.backgroundColor='transparent'}>
-                  <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '6px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                      {comp.logo ? <img src={comp.logo} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Building size={16} color="var(--text-muted)" />}
-                    </div>
-                    {comp.name}
-                  </td>
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <button style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }} onClick={(e) => { e.stopPropagation(); openAddAgentModal(comp); }}>
-                      Ajouter Agent
-                    </button>
-                  </td>
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                        {(notesStats[comp.id]?.monthly) || 0}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ce mois</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {(notesStats[comp.id]?.total) || 0}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>total</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#8b5cf6' }}>
-                        {(aiStats[comp.id]?.monthly) || 0}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ce mois</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#8b5cf6' }}>
-                        {(aiStats[comp.id]?.total) || 0}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>total</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    <button style={{ backgroundColor: isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: isActive ? 'var(--success)' : 'var(--danger)', border: '1px solid', borderColor: isActive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); handleRenewSubscriptionClick(comp); }}>
-                      {isActive ? `Actif (${daysRemaining} j.)` : 'Expiré'}
-                    </button>
-                  </td>
-                  <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{comp.legalInfo?.nif || '-'}</td>
-                </tr>
-              )
-            })}
-            {companies.filter(c => c.id !== 'c_admin').length === 0 && (
-              <tr>
-                <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aucune entreprise enregistrée.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        </div>
-      </div>
-
-      {/* POPUP : NOUVELLE ENTREPRISE */}
-      <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Ajouter une Nouvelle Entreprise">
-        <form onSubmit={handleAddCompanySubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Nom de l'entreprise *</label>
-              <input name="name" style={inputStyle} value={editCompany?.name || ''} onChange={handleLegalInfoChange} required />
-            </div>
-            <div>
-              <label style={labelStyle}>Numéro NIF</label>
-              <input name="nif" style={inputStyle} value={editCompany?.legalInfo?.nif || ''} onChange={handleLegalInfoChange} />
-            </div>
-            <div>
-              <label style={labelStyle}>Numéro RCCM</label>
-              <input name="rccm" style={inputStyle} value={editCompany?.legalInfo?.rccm || ''} onChange={handleLegalInfoChange} />
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Pied de page (S'affiche en bas des impressions)</label>
-              <input name="footer_text" style={inputStyle} value={editCompany?.footer_text || ''} onChange={(e) => setEditCompany({...editCompany, footer_text: e.target.value})} placeholder="Ex: FAST Dédouanement | NIF : 12345 | BP : 0000 Libreville" />
-            </div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-            <button type="button" onClick={() => setIsAddModalOpen(false)} style={{ padding: '0.75rem 1.5rem', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer' }}>Annuler</button>
-            <button type="submit" style={{ padding: '0.75rem 1.5rem', backgroundColor: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}>Créer l'entreprise</button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* POPUP : DÉTAILS DE L'ENTREPRISE */}
-      <Modal isOpen={isDetailsModalOpen && selectedCompany} onClose={() => setIsDetailsModalOpen(false)} title={`Dossier : ${selectedCompany?.name}`}>
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
-          <button onClick={() => setActiveSubTab('infos')} style={{ padding: '1rem', background: 'none', border: 'none', borderBottom: activeSubTab === 'infos' ? '2px solid var(--accent-primary)' : '2px solid transparent', color: activeSubTab === 'infos' ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer' }}>Informations Légales & Logo</button>
-          <button onClick={() => setActiveSubTab('agents')} style={{ padding: '1rem', background: 'none', border: 'none', borderBottom: activeSubTab === 'agents' ? '2px solid var(--accent-primary)' : '2px solid transparent', color: activeSubTab === 'agents' ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer' }}>Membres (Agents)</button>
-        </div>
-
-        {activeSubTab === 'infos' && editCompany && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '1.5rem' }}>
-              <div style={{ width: '80px', height: '80px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                {editCompany.logo ? <img src={editCompany.logo} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Building size={32} color="#94a3b8" />}
+      {mainTab === 'companies' && (
+        <div className="fade-in">
+          {/* KPI Cards */}
+          <div className="grid-mobile-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ padding: '1rem', borderRadius: '50%', backgroundColor: 'rgba(59, 130, 246, 0.1)' }}>
+                <Building size={24} color="var(--accent-primary)" />
               </div>
               <div>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '0.85rem' }}>
-                  Modifier le logo
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleCompanyLogoUpload} />
-                </label>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Entreprises Actives</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{activeCompaniesCount}</div>
               </div>
-              <div style={{ flex: 1, textAlign: 'right' }}>
-                <button onClick={() => handleRenewSubscriptionClick(selectedCompany)} style={{ padding: '0.6rem 1rem', backgroundColor: '#e0e7ff', color: 'var(--accent-primary)', border: '1px solid #c7d2fe', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>
-                  Renouveler Abonnement
+            </div>
+            
+            <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ padding: '1rem', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
+                <Users size={24} color="var(--success)" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Déclarants Enregistrés</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{totalUsersCount}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tableau des entreprises */}
+          <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '2rem', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--accent-primary)' }}>Liste des Entreprises</h2>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  onClick={async () => { setIsRefreshing(true); await refreshData(); setIsRefreshing(false); }}
+                  title="Actualiser les statistiques"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--bg-primary)'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                >
+                  <RefreshCw size={15} style={{ animation: isRefreshing ? 'spin 0.8s linear infinite' : 'none' }} />
+                  {isRefreshing ? 'Actualisation...' : 'Actualiser'}
+                </button>
+                <button onClick={openAddModal} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}>
+                  <Plus size={16} /> Ajouter une Entreprise
+                </button>
+              </div>
+            </div>
+            
+            <div className="table-responsive-wrapper">
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+                <thead>
+                 <tr style={{ backgroundColor: 'var(--bg-tertiary)', borderBottom: '2px solid var(--border-color)' }}>
+                  <th style={{ padding: '0.75rem 1rem' }}>Nom de l'entreprise</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Agents</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Notes ce mois</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Notes total</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>IA ce mois</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>IA total</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Abonnement</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>NIF</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies.filter(c => c.id !== 'c_admin').map(comp => {
+                  const daysRemaining = Math.ceil((new Date(comp.subscription?.endDate || Date.now()) - new Date()) / (1000 * 60 * 60 * 24));
+                  const isActive = daysRemaining > 0;
+                  const compUsersCount = allUsers.filter(u => u.companyId === comp.id && u.role === 'declarant').length;
+                  return (
+                    <tr 
+                      key={comp.id} 
+                      onClick={() => handleOpenDetails(comp)}
+                      style={{ borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'background-color 0.15s' }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          {comp.logo ? (
+                            <img src={comp.logo} alt="" style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '4px' }} />
+                          ) : (
+                            <div style={{ width: '28px', height: '28px', borderRadius: '4px', backgroundColor: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Building size={16} color="var(--text-muted)" />
+                            </div>
+                          )}
+                          <span>{comp.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                        <span style={{ backgroundColor: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 600 }}>
+                          {compUsersCount}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                        {notesStats[comp.id]?.monthly || 0}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        {notesStats[comp.id]?.total || 0}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, color: '#10B981' }}>
+                        {aiStats[comp.id]?.monthly || 0}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        {aiStats[comp.id]?.total || 0}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        <span style={{ 
+                          display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                          color: isActive ? 'var(--success)' : 'var(--danger)', 
+                          fontWeight: 600,
+                          backgroundColor: isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                          padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.8rem'
+                        }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: isActive ? 'var(--success)' : 'var(--danger)' }}></span>
+                          {isActive ? `${daysRemaining}j restants` : 'Expiré'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>{comp.nif || '-'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mainTab === 'documents' && (
+        <div className="fade-in">
+          {/* KPI Cards Documents */}
+          <div className="grid-mobile-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2.5rem' }}>
+            <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ padding: '1rem', borderRadius: '50%', backgroundColor: 'rgba(59, 130, 246, 0.1)' }}>
+                <FileText size={24} color="var(--accent-primary)" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Fichiers Personnalisés</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{customDocs.length}</div>
+              </div>
+            </div>
+            
+            <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ padding: '1rem', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
+                <Folder size={24} color="var(--success)" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Dossiers Cibles</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{new Set(customDocs.map(d => d.category)).size}</div>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ padding: '1rem', borderRadius: '50%', backgroundColor: 'rgba(234, 88, 12, 0.1)' }}>
+                <Upload size={24} color="#ea580c" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Taille Globale</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>
+                  {formatFileSize(customDocs.reduce((acc, d) => acc + (d.file_size || 0), 0))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tableau des Documents */}
+          <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '2rem', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', margin: '0 0 0.25rem 0', color: 'var(--accent-primary)' }}>Documentation Douanière Personnalisée</h2>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Tous les documents chargés ici s'affichent automatiquement dans l'espace Documentation de tous les utilisateurs.</p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  onClick={fetchCustomDocs}
+                  title="Actualiser la liste"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}
+                >
+                  <RefreshCw size={15} style={{ animation: docLoading ? 'spin 0.8s linear infinite' : 'none' }} />
+                  Actualiser
+                </button>
+                <button
+                  onClick={() => setIsDocModalOpen(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)' }}
+                >
+                  <Plus size={16} /> Charger un Document PDF
                 </button>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={labelStyle}>Nom de l'entreprise</label>
-                <input name="name" style={inputStyle} value={editCompany.name} onChange={handleLegalInfoChange} />
+            {docLoading ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                <div className="spinner" style={{ margin: '0 auto 1rem', width: '28px', height: '28px', border: '3px solid var(--accent-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}></div>
+                Chargement des documents...
               </div>
-              <div>
-                <label style={labelStyle}>Numéro NIF</label>
-                <input name="nif" style={inputStyle} value={editCompany.legalInfo.nif} onChange={handleLegalInfoChange} />
+            ) : customDocs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', border: '2px dashed var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }}>
+                <Folder size={48} color="var(--text-muted)" style={{ opacity: 0.4, marginBottom: '1rem' }} />
+                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem', color: 'var(--text-primary)' }}>Aucun document ajouté pour le moment</h3>
+                <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '480px', marginInline: 'auto' }}>
+                  Vous pouvez charger manuellement des arrêtés ministériels, notes de service, circulaires ou guides au format PDF. Ils apparaîtront instantanément dans l'explorateur de documentation.
+                </p>
+                <button
+                  onClick={() => setIsDocModalOpen(true)}
+                  className="premium-btn"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <Upload size={16} /> Charger un premier document
+                </button>
               </div>
-              <div>
-                <label style={labelStyle}>Numéro RCCM</label>
-                <input name="rccm" style={inputStyle} value={editCompany.legalInfo.rccm} onChange={handleLegalInfoChange} />
+            ) : (
+              <div className="table-responsive-wrapper">
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: 'var(--bg-tertiary)', borderBottom: '2px solid var(--border-color)' }}>
+                      <th style={{ padding: '0.75rem 1rem' }}>Titre du document</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Dossier cible</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Taille</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Date d'ajout</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customDocs.map(doc => (
+                      <tr key={doc.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <FileText size={16} color="var(--accent-primary)" />
+                            <span>{doc.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            {doc.category}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>
+                          {formatFileSize(doc.file_size)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>
+                          {new Date(doc.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                            <a
+                              href={doc.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Visualiser le fichier"
+                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '6px', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', transition: 'all 0.2s' }}
+                              onMouseOver={e => e.currentTarget.style.color = 'var(--accent-primary)'}
+                              onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                            >
+                              <Eye size={16} />
+                            </a>
+                            <button
+                              onClick={() => handleDeleteDocClick(doc)}
+                              title="Supprimer ce document"
+                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }}
+                              onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)'}
+                              onMouseOut={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div>
-                <label style={labelStyle}>Email Principal</label>
-                <input name="email" style={inputStyle} value={editCompany.legalInfo.email} onChange={handleLegalInfoChange} />
-              </div>
-              <div>
-                <label style={labelStyle}>Téléphone</label>
-                <input name="phone" style={inputStyle} value={editCompany.legalInfo.phone} onChange={handleLegalInfoChange} />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={labelStyle}>Adresse physique</label>
-                <input name="address" style={inputStyle} value={editCompany?.legalInfo?.address || ''} onChange={handleLegalInfoChange} />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginTop: '1rem' }}>
-              <label style={labelStyle}>Pied de page (Texte à afficher en bas des impressions)</label>
-              <input name="footer_text" style={inputStyle} value={editCompany?.footer_text || ''} onChange={(e) => setEditCompany({...editCompany, footer_text: e.target.value})} placeholder="Ex: FAST Dédouanement | NIF : 12345 | BP : 0000 Libreville" />
-            </div>
-
-            <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-              <button onClick={saveCompanyInfos} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', backgroundColor: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}>
-                <Save size={16} /> Enregistrer
-              </button>
-            </div>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
-        {activeSubTab === 'agents' && selectedCompany && (
+      {/* Modal Charger un document PDF */}
+      <Modal isOpen={isDocModalOpen} onClose={() => !isUploadingDoc && setIsDocModalOpen(false)} title="Charger un Document dans la Documentation">
+        <form onSubmit={handleUploadDoc} style={{ display: 'grid', gap: '1.25rem' }}>
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>Gérez les accès pour cette entreprise.</p>
-              <button onClick={() => openAddAgentModal()} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}>
-                <UserPlus size={16} /> Ajouter un utilisateur
-              </button>
+            <label style={labelStyle}>Titre / Nom officiel du document *</label>
+            <input
+              style={inputStyle}
+              placeholder="Ex: Arrêté Ministériel n° 0045/2026 fixant les valeurs mercuriales..."
+              value={newDocData.name}
+              onChange={(e) => setNewDocData({ ...newDocData, name: e.target.value })}
+              required
+              disabled={isUploadingDoc}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Dossier de destination dans la Documentation *</label>
+            <select
+              style={inputStyle}
+              value={newDocData.category}
+              onChange={(e) => setNewDocData({ ...newDocData, category: e.target.value })}
+              disabled={isUploadingDoc}
+            >
+              <option value="Note de Service et Arretes Douane">Note de Service et Arrêtés Douane</option>
+              <option value="Code des Douanes Gabonais">Code des Douanes Gabonais</option>
+              <option value="Reglementation Douaniere">Réglementation Douanière CEMAC</option>
+              <option value="Tarif des Droits et Taxes 2022">Tarif des Droits et Taxes 2022</option>
+              <option value="NOTE EXPLICATIVE systeme harmonise 2022">NOTE EXPLICATIVE système harmonisé 2022</option>
+              <option value="Circulaires & Instructions Récentes">Circulaires & Instructions Récentes</option>
+              <option value="__custom__">+ Créer un nouveau dossier personnalisé...</option>
+            </select>
+          </div>
+
+          {newDocData.category === '__custom__' && (
+            <div>
+              <label style={labelStyle}>Nom du nouveau dossier *</label>
+              <input
+                style={inputStyle}
+                placeholder="Ex: Arrêtés Ministériels 2026, Circulaires Portuaires..."
+                value={newDocData.customCategory}
+                onChange={(e) => setNewDocData({ ...newDocData, customCategory: e.target.value })}
+                required
+                disabled={isUploadingDoc}
+              />
             </div>
-            
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--bg-tertiary)', borderBottom: '2px solid var(--border-color)' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Nom de l'utilisateur</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Email de connexion</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allUsers.filter(u => u.companyId === selectedCompany.id && u.role === 'declarant').map(u => (
-                  <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '1rem', fontWeight: 500 }}>{u.name}</td>
-                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{u.email}</td>
-                    <td style={{ padding: '1rem', textAlign: 'right' }}>
-                      <button onClick={() => handleDeleteAgentClick(u.id)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }} title="Supprimer l'accès"><Trash2 size={16} /></button>
-                    </td>
-                  </tr>
-                ))}
-                {allUsers.filter(u => u.companyId === selectedCompany.id && u.role === 'declarant').length === 0 && (
-                  <tr>
-                    <td colSpan="3" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aucun agent enregistré pour cette entreprise.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          )}
+
+          <div>
+            <label style={labelStyle}>Fichier PDF *</label>
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setNewDocData(prev => ({
+                    ...prev,
+                    file,
+                    name: prev.name ? prev.name : file.name.replace(/\.pdf$/i, '')
+                  }));
+                }
+              }}
+              style={{ ...inputStyle, padding: '0.6rem' }}
+              required
+              disabled={isUploadingDoc}
+            />
+            {newDocData.file && (
+              <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                Taille : {formatFileSize(newDocData.file.size)}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+            <button
+              type="button"
+              onClick={() => setIsDocModalOpen(false)}
+              disabled={isUploadingDoc}
+              style={{ padding: '0.75rem 1.5rem', backgroundColor: 'var(--bg-tertiary)', border: 'none', borderRadius: '6px', cursor: isUploadingDoc ? 'not-allowed' : 'pointer', color: 'var(--text-primary)' }}
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isUploadingDoc || !newDocData.file || !newDocData.name.trim()}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '6px', cursor: isUploadingDoc ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: isUploadingDoc ? 0.7 : 1 }}
+            >
+              {isUploadingDoc ? (
+                <>
+                  <span className="spinner" style={{ width: '16px', height: '16px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}></span>
+                  Téléversement en cours...
+                </>
+              ) : (
+                <>
+                  <Upload size={16} /> Publier dans la Documentation
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal Détails Entreprise */}
+      <Modal isOpen={isDetailsModalOpen} onClose={() => setIsDetailsModalOpen(false)} title={`Fiche Entreprise : ${selectedCompany?.name}`}>
+        {editCompany && (
+          <div>
+            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+              <button onClick={() => setActiveSubTab('infos')} style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', borderBottom: activeSubTab === 'infos' ? '2px solid var(--accent-primary)' : 'none', color: activeSubTab === 'infos' ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer' }}>Informations & Valeurs</button>
+              <button onClick={() => setActiveSubTab('agents')} style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', borderBottom: activeSubTab === 'agents' ? '2px solid var(--accent-primary)' : 'none', color: activeSubTab === 'agents' ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer' }}>Agents ({allUsers.filter(u => u.companyId === selectedCompany?.id && u.role === 'declarant').length})</button>
+            </div>
+
+            {activeSubTab === 'infos' ? (
+              <div style={{ display: 'grid', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Statut de l'abonnement</div>
+                    <div style={{ fontWeight: 600, color: (Math.ceil((new Date(selectedCompany?.subscription?.endDate || Date.now()) - new Date()) / (1000 * 60 * 60 * 24)) > 0) ? 'var(--success)' : 'var(--danger)' }}>
+                      {(Math.ceil((new Date(selectedCompany?.subscription?.endDate || Date.now()) - new Date()) / (1000 * 60 * 60 * 24)) > 0) ? `Actif jusqu'au ${new Date(selectedCompany?.subscription?.endDate).toLocaleDateString()}` : 'Abonnement Expiré'}
+                    </div>
+                  </div>
+                  <button onClick={handleRenewClick} style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}>Renouveler</button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                  <div>
+                    <label style={labelStyle}>Nom de l'entreprise</label>
+                    <input style={inputStyle} value={editCompany.name} onChange={(e) => setEditCompany({...editCompany, name: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>NIF</label>
+                    <input style={inputStyle} value={editCompany.nif} onChange={(e) => setEditCompany({...editCompany, nif: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Email</label>
+                    <input style={inputStyle} value={editCompany.email} onChange={(e) => setEditCompany({...editCompany, email: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Téléphone</label>
+                    <input style={inputStyle} value={editCompany.phone} onChange={(e) => setEditCompany({...editCompany, phone: e.target.value})} />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Adresse</label>
+                  <input style={inputStyle} value={editCompany.address} onChange={(e) => setEditCompany({...editCompany, address: e.target.value})} />
+                </div>
+
+                <h3 style={{ fontSize: '1.1rem', margin: '1rem 0 0.5rem 0', color: 'var(--text-primary)' }}>Paramètres douaniers par défaut</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                  <div>
+                    <label style={labelStyle}>Régime Douanier</label>
+                    <input style={inputStyle} value={editCompany.settings?.regimeDouanier || ''} onChange={(e) => setEditCompany({...editCompany, settings: {...editCompany.settings, regimeDouanier: e.target.value}})} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Bureau de Douane</label>
+                    <input style={inputStyle} value={editCompany.settings?.bureauDouane || ''} onChange={(e) => setEditCompany({...editCompany, settings: {...editCompany.settings, bureauDouane: e.target.value}})} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Type Déclaration</label>
+                    <input style={inputStyle} value={editCompany.settings?.declarationType || ''} onChange={(e) => setEditCompany({...editCompany, settings: {...editCompany.settings, declarationType: e.target.value}})} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Clé Douane</label>
+                    <input style={inputStyle} value={editCompany.settings?.cleDouane || ''} onChange={(e) => setEditCompany({...editCompany, settings: {...editCompany.settings, cleDouane: e.target.value}})} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Clé Centre</label>
+                    <input style={inputStyle} value={editCompany.settings?.cleCentre || ''} onChange={(e) => setEditCompany({...editCompany, settings: {...editCompany.settings, cleCentre: e.target.value}})} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Devise</label>
+                    <input style={inputStyle} value={editCompany.settings?.deviseParDefaut || ''} onChange={(e) => setEditCompany({...editCompany, settings: {...editCompany.settings, deviseParDefaut: e.target.value}})} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+                  <button onClick={() => setIsDetailsModalOpen(false)} style={{ padding: '0.75rem 1.5rem', backgroundColor: 'var(--bg-tertiary)', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Annuler</button>
+                  <button onClick={handleSaveCompanyDetails} style={{ padding: '0.75rem 1.5rem', backgroundColor: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Enregistrer</button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1rem' }}>Liste des déclarants</h3>
+                  <button onClick={() => openAddAgentModal()} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                    <Plus size={14} /> Ajouter un déclarant
+                  </button>
+                </div>
+                
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
+                      <th style={{ padding: '0.5rem' }}>Nom</th>
+                      <th style={{ padding: '0.5rem' }}>Email</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allUsers.filter(u => u.companyId === selectedCompany?.id && u.role === 'declarant').map(agent => (
+                      <tr key={agent.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.5rem' }}>{agent.name}</td>
+                        <td style={{ padding: '0.5rem' }}>{agent.email}</td>
+                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                          <button onClick={() => handleDeleteAgentClick(agent.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '0.2rem' }}><Trash2 size={16} /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </Modal>
 
-      {/* Renew Subscription Modal */}
-      <Modal isOpen={renewModalOpen} onClose={() => setRenewModalOpen(false)} title="Renouveler l'abonnement">
-        <div style={{ display: 'grid', gap: '1rem' }}>
-          <label style={labelStyle}>Nombre de jours à appliquer (depuis aujourd'hui)</label>
-          <input type="number" style={inputStyle} value={renewDays} onChange={(e) => setRenewDays(e.target.value)} />
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Mettre un nombre réduit permet de diminuer la période restante d'un utilisateur.</p>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+      {/* Modal Ajout Entreprise */}
+      <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Ajouter une Entreprise">
+        {editCompany && (
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+              <div>
+                <label style={labelStyle}>Nom de l'entreprise *</label>
+                <input style={inputStyle} value={editCompany.name} onChange={(e) => setEditCompany({...editCompany, name: e.target.value})} />
+              </div>
+              <div>
+                <label style={labelStyle}>NIF</label>
+                <input style={inputStyle} value={editCompany.nif} onChange={(e) => setEditCompany({...editCompany, nif: e.target.value})} />
+              </div>
+              <div>
+                <label style={labelStyle}>Email *</label>
+                <input style={inputStyle} value={editCompany.email} onChange={(e) => setEditCompany({...editCompany, email: e.target.value})} />
+              </div>
+              <div>
+                <label style={labelStyle}>Téléphone</label>
+                <input style={inputStyle} value={editCompany.phone} onChange={(e) => setEditCompany({...editCompany, phone: e.target.value})} />
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Adresse</label>
+              <input style={inputStyle} value={editCompany.address} onChange={(e) => setEditCompany({...editCompany, address: e.target.value})} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+              <button onClick={() => setIsAddModalOpen(false)} style={{ padding: '0.75rem 1.5rem', backgroundColor: 'var(--bg-tertiary)', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Annuler</button>
+              <button onClick={submitCreateCompany} style={{ padding: '0.75rem 1.5rem', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Créer l'entreprise</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Renouvellement */}
+      <Modal isOpen={renewModalOpen} onClose={() => setRenewModalOpen(false)} title={`Renouveler l'abonnement - ${selectedCompany?.name}`}>
+        <div style={{ display: 'grid', gap: '1.5rem' }}>
+          <div>
+            <label style={labelStyle}>Durée du renouvellement (jours)</label>
+            <input type="number" min="1" style={inputStyle} value={renewDays} onChange={(e) => setRenewDays(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
             <button onClick={() => setRenewModalOpen(false)} style={{ padding: '0.75rem 1.5rem', backgroundColor: 'var(--bg-tertiary)', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Annuler</button>
-            <button onClick={submitRenewSubscription} style={{ padding: '0.75rem 1.5rem', backgroundColor: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Appliquer</button>
+            <button onClick={submitRenewal} style={{ padding: '0.75rem 1.5rem', backgroundColor: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Confirmer le renouvellement</button>
           </div>
         </div>
       </Modal>
 
-      {/* Add Agent Modal */}
+      {/* Modal Ajout Déclarant */}
       <Modal isOpen={addAgentModalOpen} onClose={() => setAddAgentModalOpen(false)} title="Ajouter un utilisateur">
         <div style={{ display: 'grid', gap: '1rem' }}>
           <div>
