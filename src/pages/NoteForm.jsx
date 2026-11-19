@@ -96,18 +96,63 @@ const NoteForm = () => {
   // Nouveau state pour l'article en cours d'ajout
   const [newArticle, setNewArticle] = useState(null);
 
-  // Sépare la section « Règles de classification » du reste de l'explication IA,
-  // pour l'afficher et l'imprimer dans son propre bloc.
+  // Découpe l'explication Markdown de l'IA en sections (titres ###) :
+  // - description : texte avant le 1er titre + section « Description détaillée »
+  // - regles      : section « Règles de classification »
+  // - sections    : toutes les autres (Positions écartées, Niveau de certitude,
+  //                 Points de vigilance, Recommandation, Informations manquantes…)
   const splitClassificationRules = (markdown) => {
     const text = String(markdown || '');
-    const heading = /^\s*#{1,6}\s*(?:\d+[.)]\s*)?\**\s*R[èeé]gles?\s+(?:g[ée]n[ée]rales\s+)?(?:de\s+classification|de\s+classement|interpr[ée]tatives)[^\n]*$/im;
-    const m = heading.exec(text);
-    if (!m) return { description: text.trim(), regles: '' };
-    let description = text.slice(0, m.index).trim();
-    const regles = text.slice(m.index + m[0].length).trim();
-    // Retire le titre « Description détaillée » (déjà affiché comme intitulé de bloc)
-    description = description.replace(/^\s*#{1,6}\s*(?:\d+[.)]\s*)?\**\s*Description d[ée]taill[ée]e[^\n]*\n?/i, '').trim();
-    return { description, regles };
+    const headingRe = /^[ \t]*#{1,6}[ \t]*(?:\d+[.)][ \t]*)?\**[ \t]*([^\n#*][^\n]*?)\**[ \t]*$/gm;
+    const isDescription = (t) => /^description/i.test(t);
+    const isRegles = (t) => /^r[èeé]gles?\s+(?:g[ée]n[ée]rales\s+)?(?:de\s+classification|de\s+classement|interpr[ée]tatives)|^justification/i.test(t);
+    const matches = [...text.matchAll(headingRe)];
+    if (matches.length === 0) return { description: text.trim(), regles: '', sections: [] };
+
+    let description = text.slice(0, matches[0].index).trim();
+    let regles = '';
+    const sections = [];
+    matches.forEach((m, i) => {
+      const title = m[1].replace(/[:：]\s*$/, '').trim();
+      const body = text.slice(m.index + m[0].length, i + 1 < matches.length ? matches[i + 1].index : text.length).trim();
+      if (!body) return;
+      if (isDescription(title)) description = [description, body].filter(Boolean).join('\n\n');
+      else if (isRegles(title)) regles = [regles, body].filter(Boolean).join('\n\n');
+      else if (/manquant/i.test(title) && /^[\s*_-]*(aucune|néant|neant|n\/a|rien)/i.test(body)) return;
+      else sections.push({ title, body });
+    });
+    return { description, regles, sections };
+  };
+
+  // Couleur du bloc selon le titre de section (certitude, vigilance…)
+  const aiSectionAccent = (title, body) => {
+    if (/certitude/i.test(title)) {
+      const lvl = String(body).replace(/[*_\s]/g, '').toLowerCase();
+      if (lvl.startsWith('élevé') || lvl.startsWith('eleve')) return '#059669';
+      if (lvl.startsWith('moyen')) return '#d97706';
+      if (lvl.startsWith('faible')) return '#dc2626';
+    }
+    if (/vigilance|manquant/i.test(title)) return '#d97706';
+    return '#2563eb';
+  };
+
+  // Récupère code/libellé/taux/explication même si le JSON de l'IA est coupé
+  // (réponse tronquée par la limite de tokens du modèle).
+  const salvageTruncatedAiJson = (text) => {
+    const field = (k) => {
+      const m = text.match(new RegExp(`"${k}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+      if (!m) return '';
+      try { return JSON.parse(`"${m[1]}"`); } catch { return m[1]; }
+    };
+    let explanation = '';
+    const start = text.match(/"explanation"\s*:\s*"/);
+    if (start) {
+      let raw = text.slice(start.index + start[0].length);
+      raw = raw.replace(/"\s*\}?\s*(?:```)?\s*$/, '').replace(/\\$/, '');
+      try { explanation = JSON.parse(`"${raw}"`); }
+      catch { explanation = raw.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\'); }
+    }
+    return { code: field('code'), libelle: field('libelle'), taux: field('taux'), explanation };
   };
 
   const handlePrintAiResult = () => {
@@ -935,24 +980,53 @@ const NoteForm = () => {
                   if (!aiQuery.trim()) return;
                   setAiLoading(true);
                   setAiResult({ code: '', libelle: '', explanation: '', taux: '', imageUrl: '' });
-                  const prompt = `En tant qu'expert strict en nomenclature douanière de la CEMAC (spécifiquement pour le Gabon), analyse le produit suivant : "${aiQuery}".
-⚠️ RÈGLE ABSOLUE : Tes résultats doivent se baser UNIQUEMENT sur le Tarif Extérieur Commun (TEC) de la CEMAC et la réglementation du Gabon. Ne cite AUCUNE autre législation étrangère (comme l'UE ou le Canada).
-Fournis :
-1. Le code SH CEMAC (à 8 chiffres) le plus pertinent.
-2. Le vrai libellé tarifaire officiel du produit selon la nomenclature douanière CEMAC (ATTENTION : Ne reprends JAMAIS textuellement les mots-clés de recherche saisis par l'utilisateur, mais formule le VRAI libellé tarifaire officiel tel qu'il doit figurer sur la déclaration en douane).
-3. Le taux de Droit de Douane (DD) applicable selon les 4 catégories CEMAC (Catégorie 1: 5%, Catégorie 2: 10%, Catégorie 3: 20%, Catégorie 4: 30%).
-4. L'explication détaillée en Markdown, qui DOIT contenir les Règles de classification appliquées.
-IMPORTANT: Utilise du Markdown pour structurer ta réponse (titres ###, gras, puces).
-Le champ "explanation" doit contenir EXACTEMENT ces deux sections, dans cet ordre, avec ces titres :
+                  const prompt = `RÔLE
+Tu es un expert en nomenclature douanière avec plus de 20 ans d'expérience dans le classement tarifaire selon le Système Harmonisé (SH) de l'Organisation Mondiale des Douanes et le Tarif Extérieur Commun (TEC) de la CEMAC (application au Gabon). Tu maîtrises les Règles Générales Interprétatives (RGI), les Notes de Sections et de Chapitres, les Notes explicatives du SH et les avis de classement de l'OMD.
+
+MISSION
+Détermine le code tarifaire exact du produit décrit ci-dessous. Justifie chaque étape de ton raisonnement avec la rigueur d'un dossier de contentieux douanier.
+
+PRODUIT À CLASSER (description saisie par le déclarant) :
+"${aiQuery}"
+Les éléments non fournis (composition, usage, présentation, origine…) sont à considérer comme NON PRÉCISÉS.
+
+MÉTHODE
+1. Analyse la nature, la matière constitutive, la fonction et le degré d'élaboration du produit.
+2. Identifie la Section et le Chapitre, en citant les Notes applicables et leurs exclusions.
+3. Applique les RGI dans l'ordre, de la RGI 1 à la RGI 6, et indique à quelle règle le classement est arrêté et pourquoi.
+4. Présente les positions concurrentes envisageables et explique pourquoi tu les écartes.
+5. Cite les Notes explicatives, avis de classement OMD ou décisions pertinents. Signale toute référence dont tu n'es pas certain.
+6. Si une information déterminante manque, ne fais AUCUNE supposition : liste les questions à poser au déclarant dans la section « Informations manquantes », propose le classement le plus probable SOUS RÉSERVE et abaisse le niveau de certitude en conséquence.
+
+RÈGLES
+- Utilise la nomenclature SH édition 2022 et le TEC CEMAC ; précise l'édition utilisée. Ne cite AUCUNE autre législation (UE, Canada, etc.).
+- Classe toujours d'après la nature objective du produit, jamais d'après sa seule désignation commerciale.
+- Distingue clairement ce qui est certain de ce qui relève de l'interprétation.
+- Réponds en français, avec la terminologie douanière officielle.
+- Le libellé doit être le VRAI libellé tarifaire officiel CEMAC tel qu'il figure sur la déclaration en douane : ne reprends JAMAIS textuellement les mots saisis par le déclarant.
+- Le taux de Droit de Douane (DD) suit les 4 catégories CEMAC (Cat. 1 : 5 %, Cat. 2 : 10 %, Cat. 3 : 20 %, Cat. 4 : 30 %).
+- Sois CONCIS : 2 à 5 puces courtes par section. La réponse complète doit rester courte.
+
+FORMAT DE RÉPONSE
+Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
+"code" : sous-position TEC CEMAC complète à 8 chiffres (ex : "87032110")
+"libelle" : libellé tarifaire officiel CEMAC de cette sous-position
+"taux" : taux DD (ex : "30%")
+"explanation" : texte Markdown contenant les sections suivantes, dans cet ordre et avec EXACTEMENT ces titres :
 ### Description détaillée
-Description détaillée du produit (nature, composition, usage) et critères de classement dans la position retenue.
+(nature, matière, fonction, degré d'élaboration ; Section et Chapitre avec leurs Notes et exclusions ; code SH 6 chiffres et son libellé officiel ; sous-position TEC CEMAC complète et son libellé ; édition SH utilisée)
 ### Règles de classification
-Liste à puces des Règles Générales Interprétatives (RGI) du Système Harmonisé effectivement appliquées pour aboutir à ce code (ex : RGI 1, RGI 3 a), RGI 6), ainsi que les Notes de Section ou de Chapitre pertinentes. Pour chaque règle : son numéro, son énoncé résumé, et en une phrase pourquoi elle s'applique à ce produit. Sois concis (5 puces au maximum).
-Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
-"code" : code à 8 chiffres (ex: "87032110")
-"libelle" : vrai libellé tarifaire officiel CEMAC (ex: "Voitures de tourisme à moteur à essence, d'une cylindrée n'excédant pas 1000 cm3")
-"taux" : taux DD (ex: "30%")
-"explanation" : les deux sections Markdown ci-dessus ("### Description détaillée" puis "### Règles de classification")`;
+(RGI appliquées dans l'ordre de 1 à 6 en indiquant celle où le classement est arrêté et pourquoi ; Notes explicatives et avis OMD pertinents, en signalant toute référence incertaine)
+### Positions écartées
+(positions concurrentes et motif d'exclusion de chacune)
+### Niveau de certitude
+(commence par « Élevé », « Moyen » ou « Faible », puis explique ; distingue le certain de l'interprétation)
+### Points de vigilance
+(risques de requalification, licences, normes, interdictions, taxes spécifiques, documents à prévoir)
+### Recommandation
+(si la certitude n'est pas élevée, conseille une demande de renseignement tarifaire préalable auprès de la douane)
+### Informations manquantes
+(uniquement si des informations déterminantes manquent : questions à poser au déclarant)`;
                   const apiBase = (typeof window !== 'undefined' && (window.__TAURI__ || window.location.origin.includes('localhost') || window.location.origin.includes('tauri'))) ? 'https://gnamatech.com' : '';
                   customFetch(`${apiBase}/api/ai`, {
                     method: 'POST',
@@ -975,6 +1049,7 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                     let parsedTaux = '';
                     let parsedExplanation = text;
                     const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    let jsonOk = false;
                     if (jsonMatch) {
                       try {
                         const parsed = JSON.parse(jsonMatch[0]);
@@ -982,7 +1057,15 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                         parsedLibelle = parsed.libelle || '';
                         parsedTaux = parsed.taux || '';
                         parsedExplanation = parsed.explanation || text;
-                      } catch { /* ignore */ }
+                        jsonOk = true;
+                      } catch { /* JSON invalide : tentative de récupération ci-dessous */ }
+                    }
+                    if (!jsonOk && /"explanation"\s*:/.test(text)) {
+                      const s = salvageTruncatedAiJson(text);
+                      if (s.code || s.explanation) {
+                        parsedCode = s.code; parsedLibelle = s.libelle; parsedTaux = s.taux;
+                        parsedExplanation = (s.explanation || '') + '\n\n> ⚠️ Réponse de l\'IA incomplète (coupée). Relancez la recherche si une section manque.';
+                      }
                     }
 
                     if (parsedCode && typeof tariffs !== 'undefined' && tariffs.length > 0) {
@@ -1018,8 +1101,8 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                       }
                     }
 
-                    const { description, regles } = splitClassificationRules(parsedExplanation);
-                    setAiResult({ code: parsedCode, libelle: parsedLibelle, taux: parsedTaux, explanation: description, regles, imageUrl: foundImage, model: usedModel });
+                    const { description, regles, sections } = splitClassificationRules(parsedExplanation);
+                    setAiResult({ code: parsedCode, libelle: parsedLibelle, taux: parsedTaux, explanation: description, regles, sections, imageUrl: foundImage, model: usedModel });
                   })
                   .catch((err) => setAiResult({ code: '', libelle: '', explanation: `Erreur réseau : ${err.message}`, imageUrl: '', model: '' }))
                   .finally(() => setAiLoading(false));
@@ -1111,6 +1194,16 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                     </div>
                   </div>
                 )}
+
+                {/* Autres sections de l'analyse (positions écartées, certitude, vigilance…) */}
+                {(aiResult.sections || []).map((s, i) => (
+                  <div key={i} style={{ width: '100%', marginTop: '1rem', padding: '0.9rem 1rem', backgroundColor: 'var(--bg-tertiary)', borderLeft: `3px solid ${aiSectionAccent(s.title, s.body)}`, borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '0.5rem' }}>{s.title}</div>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: '1.6' }} className="markdown-container">
+                      <ReactMarkdown>{s.body}</ReactMarkdown>
+                    </div>
+                  </div>
+                ))}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button
@@ -1301,6 +1394,18 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                       </div>
                     </div>
                   )}
+
+                  {/* Autres sections : positions écartées, certitude, vigilance, recommandation… */}
+                  {(aiResult.sections || []).map((s, i) => (
+                    <div key={i} style={{ marginBottom: '20px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: '6px', marginBottom: '10px', letterSpacing: '0.5px', breakAfter: 'avoid' }}>
+                        {s.title}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#1e293b', lineHeight: '1.7', textAlign: 'justify', borderLeft: `3px solid ${aiSectionAccent(s.title, s.body)}`, paddingLeft: '12px' }} className="markdown-container">
+                        <ReactMarkdown>{s.body}</ReactMarkdown>
+                      </div>
+                    </div>
+                  ))}
 
                   {/* Bas de page officiel */}
                   <div style={{ marginTop: '30px', paddingTop: '12px', borderTop: '1px solid #cbd5e1', fontSize: '10px', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
