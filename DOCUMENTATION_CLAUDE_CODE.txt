@@ -1,0 +1,132 @@
+================================================================================
+DOCUMENTATION TECHNIQUE & GUIDE DE DEPLOIEMENT - PROJET GNAMATECH
+Destine a : Claude Code, Developpeurs & Administrateurs
+================================================================================
+
+1. ACCES & IDENTIFIANTS DU PROJET
+--------------------------------------------------------------------------------
+A. Depot GitHub (Code Source)
+   - URL : https://github.com/julespog/app-douane-saisi-note-de-valeur.git
+   - Branche principale : main
+   - Droits : Invitation collaborateur sur GitHub ou cle SSH / Personal Access Token (PAT).
+
+B. Serveur VPS de Production (Heberge chez ST Digital)
+   - Adresse IP : 102.208.104.198
+   - Utilisateur SSH : root
+   - Mot de passe SSH : ba03LXi%pNZ5
+   - Port SSH : 22
+   - Repertoire web racine : /var/www/html/
+   - Repertoire des installateurs applicatifs : /var/www/html/downloads/
+   - Domaine officiel : https://gnamatech.com
+
+C. Base de Donnees & Supabase (Self-hosted sur le VPS via Docker)
+   - URL publique : https://gnamatech.com
+   - Conteneur PostgreSQL : supabase-db
+   - Commande d'acces psql :
+     docker exec -it supabase-db psql -U supabase_admin -d postgres
+   - Buckets de stockage (Storage) :
+     * "documents" : Fichiers PDF douaniers officiels et administratifs
+     * "logos" : Logos des entreprises declarantes
+   - Cle anonyme publique Supabase (Anon Key) :
+     eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE
+
+D. Cles d'API Intelligence Artificielle (Fichier .env ou Table Supabase public.ai_settings)
+   - Configuration centralisee : Toutes les cles (Claude Anthropic, Gemini, Groq) se gerent directement depuis l'espace Administration du site web ou dans la table `public.ai_settings`.
+   - Variables d'environnement de secours (.env local) :
+     VITE_GROQ_API_KEY=votre_cle_groq_ici
+     VITE_GEMINI_API_KEY=votre_cle_gemini_ici
+     VITE_CLAUDE_API_KEY=votre_cle_claude_ici
+
+
+2. DEMARRAGE & INSTALLATION LOCALE
+--------------------------------------------------------------------------------
+Prerequis : Node.js (version 20+ ou 22+) et Git.
+
+Commandes d'installation pas a pas :
+   git clone https://github.com/julespog/app-douane-saisi-note-de-valeur.git
+   cd app-douane-saisi-note-de-valeur
+   npm install
+
+Creation du fichier .env a la racine du projet (facultatif si configure dans l'admin) :
+   echo "VITE_GROQ_API_KEY=votre_cle_groq" > .env
+   echo "VITE_GEMINI_API_KEY=votre_cle_gemini" >> .env
+
+Lancer l'application en local :
+   npm run dev
+   (Disponible par defaut sur http://localhost:5173)
+
+
+3. ARCHITECTURE TECHNIQUE & FICHIERS CLES
+--------------------------------------------------------------------------------
+Le projet est compose d'un frontend React 19 qui alimente a la fois :
+- La version web servie sur le VPS (https://gnamatech.com)
+- L'application bureau native Windows via Tauri v2 (Rust + WebView2) avec support 100% hors-ligne.
+
+Fichiers cruciaux du code source :
+- src/pages/NoteForm.jsx :
+  Cœur de l'application. Formulaire de saisie de la note de detail, calcul des droits et taxes
+  (Zone CEMAC), integration de l'IA (Gemini & Groq), bouton d'impression officiel de la fiche d'expertise tarifaire.
+- src/pages/PrintNote.jsx :
+  Mise en page d'impression officielle et generation PDF de la note de detail douaniere.
+- src/pages/Documentation.jsx :
+  Explorateur documentaire CEMAC. Fusionne automatiquement les archives statiques et les documents charges
+  par l'administration avec gestion du cache hors-ligne.
+- src/pages/Dashboard.jsx :
+  Espace Superadmin pour gerer les entreprises, les declarants, les abonnements et le televersement
+  manuel de nouveaux arretes / PDF dans la documentation.
+- src/components/CustomPDFViewer.jsx :
+  Visualiseur PDF integre base sur Mozilla PDF.js (/public/pdfjs/) garantissant une lecture
+  100% hors-ligne sur Windows sans dependre d'un plugin externe. Utilise safeEncodePath().
+- src/supabaseClient.js :
+  Client Supabase equipe d'un wrapper customFetch. Sous Tauri Windows, il route les requetes
+  via @tauri-apps/plugin-http pour bypasser les blocages CORS et restrictions WebView2.
+- public/manifest_docs.json :
+  Index JSON complet des 665+ documents PDF douaniers, normalise a 100% en Unicode NFC.
+- src-tauri/tauri.conf.json :
+  Configuration du binaire Windows natif Tauri v2.
+- .github/workflows/build-windows.yml :
+  Pipeline d'integration continue GitHub Actions pour compiler l'installateur Windows (.exe / .msi).
+
+
+4. PROCEDURES DE DEPLOIEMENT
+--------------------------------------------------------------------------------
+A. Deploiement de la version Web en ligne (VPS)
+   1. Compiler le frontend :
+      npm run build
+   2. Envoyer les fichiers vers le VPS en SSH :
+      scp dist/index.html dist/manifest_docs.json dist/manifest.webmanifest dist/registerSW.js dist/sw.js root@102.208.104.198:/var/www/html/
+      scp -r dist/assets root@102.208.104.198:/var/www/html/
+
+B. Compilation et mise a disposition de l'application Windows (.exe)
+   La compilation Windows s'effectue dans le cloud GitHub Actions (aucune installation de Rust/Windows requise en local) :
+   1. Pousser les modifications sur la branche main :
+      git add .
+      git commit -m "feat: mise a jour"
+      git push origin main
+   2. Sur GitHub, aller dans l'onglet "Actions" -> "Build Gnamatech Windows Executable" -> "Run workflow".
+   3. GitHub Actions compile l'application (environ 14 minutes).
+   4. L'installateur final est place sur le VPS dans :
+      /var/www/html/downloads/Gnamatech_Setup.exe
+      /var/www/html/downloads/Gnamatech_Setup.msi
+
+
+5. REGLES CRITIQUES DE DEVELOPPEMENT
+--------------------------------------------------------------------------------
+1. Normalisation Unicode NFC obligatoire :
+   Sous Windows NTFS, tous les fichiers sont stockes en NFC (ex: \u00e9).
+   Sur macOS, le systeme de fichiers utilise souvent le NFD decompose (e + accent combine).
+   Tous les chemins de fichiers dans manifest_docs.json ou manipules dans le code doivent imperativement
+   etre normalises avec str.normalize('NFC') pour eviter des erreurs 404 sur l'application Windows.
+
+2. Encodage d'URL securise :
+   Ne jamais utiliser encodeURI() brut sur les chemins contenant des espaces, des +, des % ou des apostrophes.
+   Toujours importer et utiliser safeEncodePath() depuis src/components/CustomPDFViewer.jsx.
+
+3. Maintien du mode Hors-ligne :
+   L'application bureau Windows doit pouvoir executer tous les calculs de droits et taxes et ouvrir
+   l'integralite des PDF locaux sans aucune connexion internet active.
+
+4. Reseau Tauri :
+   Toujours conserver le wrapper customFetch dans src/supabaseClient.js pour garantir les requetes reseau
+   depuis le WebView Windows natif.
+================================================================================

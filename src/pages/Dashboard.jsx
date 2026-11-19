@@ -1,10 +1,10 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { 
   Building, Users, UserPlus, Edit3, Trash2, CheckCircle, Plus, ChevronLeft, Save, X, 
-  FileText, RefreshCw, Upload, Folder, Eye, Download, BookOpen 
+  FileText, RefreshCw, Upload, Folder, Eye, Download, BookOpen, Bot, Key, Cpu, EyeOff, ShieldCheck, Zap 
 } from 'lucide-react';
 import { UserContext } from '../context/UserContext';
-import { supabase } from '../supabaseClient';
+import { supabase, customFetch } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
 const Modal = ({ isOpen, onClose, title, children }) => {
@@ -36,7 +36,7 @@ const Dashboard = () => {
   const { user, getCompanies, getUsers, createCompany, updateCompany, createUser, removeUser, renewSubscription } = useContext(UserContext);
   const navigate = useNavigate();
 
-  // Navigation tab : 'companies' ou 'documents'
+  // Navigation tab : 'companies' | 'documents' | 'ai'
   const [mainTab, setMainTab] = useState('companies');
 
   const [companies, setCompanies] = useState([]);
@@ -56,6 +56,20 @@ const Dashboard = () => {
     customCategory: '',
     file: null
   });
+
+  // AI Configuration states
+  const [aiSettings, setAiSettings] = useState({
+    active_provider: 'claude',
+    claude_api_key: '',
+    claude_model: 'claude-3-5-sonnet-20241022',
+    gemini_api_key: '',
+    gemini_model: 'gemini-2.5-flash',
+    groq_api_key: ''
+  });
+  const [aiSettingsLoading, setAiSettingsLoading] = useState(false);
+  const [aiSettingsSaving, setAiSettingsSaving] = useState(false);
+  const [showKeys, setShowKeys] = useState({ claude: false, gemini: false, groq: false });
+  const [testResults, setTestResults] = useState({});
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -80,6 +94,7 @@ const Dashboard = () => {
     }
     refreshData();
     fetchCustomDocs();
+    fetchAiSettings();
   }, [user]);
 
   const refreshData = async () => {
@@ -89,7 +104,6 @@ const Dashboard = () => {
       setCompanies(companiesData || []);
       setAllUsers(usersData || []);
 
-      // Charger les stats de notes par entreprise
       const { data: notesData } = await supabase
         .from('notes_history')
         .select('company_id, created_at');
@@ -108,7 +122,6 @@ const Dashboard = () => {
         setNotesStats(stats);
       }
 
-      // Charger les stats de requêtes IA par entreprise
       const { data: aiData } = await supabase
         .from('ai_queries')
         .select('company_id, created_at');
@@ -144,6 +157,112 @@ const Dashboard = () => {
       console.error("Erreur chargement documents :", err);
     } finally {
       setDocLoading(false);
+    }
+  };
+
+  const fetchAiSettings = async () => {
+    setAiSettingsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('ai_settings')
+        .select('*')
+        .eq('id', 'default')
+        .single();
+      if (data) {
+        setAiSettings({
+          active_provider: data.active_provider || 'claude',
+          claude_api_key: data.claude_api_key || '',
+          claude_model: data.claude_model || 'claude-3-5-sonnet-20241022',
+          gemini_api_key: data.gemini_api_key || '',
+          gemini_model: data.gemini_model || 'gemini-2.5-flash',
+          groq_api_key: data.groq_api_key || ''
+        });
+      }
+    } catch (err) {
+      console.warn("Erreur chargement ai_settings :", err);
+    } finally {
+      setAiSettingsLoading(false);
+    }
+  };
+
+  const handleSaveAiSettings = async (e) => {
+    if (e) e.preventDefault();
+    setAiSettingsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('ai_settings')
+        .upsert({
+          id: 'default',
+          active_provider: aiSettings.active_provider,
+          claude_api_key: aiSettings.claude_api_key ? aiSettings.claude_api_key.trim() : '',
+          claude_model: aiSettings.claude_model,
+          gemini_api_key: aiSettings.gemini_api_key ? aiSettings.gemini_api_key.trim() : '',
+          gemini_model: aiSettings.gemini_model,
+          groq_api_key: aiSettings.groq_api_key ? aiSettings.groq_api_key.trim() : '',
+          updated_at: new Date().toISOString()
+        });
+      if (error) throw error;
+      setCustomAlert({
+        type: 'success',
+        message: "Clés d'API et paramètres d'IA enregistrés avec succès ! Prise d'effet immédiate sur le web et l'application Windows."
+      });
+    } catch (err) {
+      setCustomAlert({
+        type: 'error',
+        message: err.message || "Erreur lors de l'enregistrement des paramètres IA."
+      });
+    } finally {
+      setAiSettingsSaving(false);
+    }
+  };
+
+  const handleTestKey = async (provider) => {
+    setTestResults(prev => ({ ...prev, [provider]: { testing: true } }));
+    const apiBase = (typeof window !== 'undefined' && (window.__TAURI__ || window.location.origin.includes('localhost') || window.location.origin.includes('tauri'))) ? 'https://gnamatech.com' : '';
+    
+    let keyToTest = '';
+    let modelToTest = '';
+    if (provider === 'claude') {
+      keyToTest = aiSettings.claude_api_key;
+      modelToTest = aiSettings.claude_model;
+    } else if (provider === 'gemini') {
+      keyToTest = aiSettings.gemini_api_key;
+      modelToTest = aiSettings.gemini_model;
+    } else if (provider === 'groq') {
+      keyToTest = aiSettings.groq_api_key;
+    }
+
+    if (!keyToTest || !keyToTest.trim()) {
+      setTestResults(prev => ({
+        ...prev,
+        [provider]: { testing: false, ok: false, message: "Veuillez saisir une clé d'API avant de tester." }
+      }));
+      return;
+    }
+
+    try {
+      const res = await customFetch(`${apiBase}/api/ai/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, apiKey: keyToTest.trim(), model: modelToTest })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setTestResults(prev => ({
+          ...prev,
+          [provider]: { testing: false, ok: true, message: `✅ ${data.message || 'Connexion réussie !'}` }
+        }));
+      } else {
+        setTestResults(prev => ({
+          ...prev,
+          [provider]: { testing: false, ok: false, message: `❌ ${data.error || 'Erreur lors du test de connexion.'}` }
+        }));
+      }
+    } catch (err) {
+      setTestResults(prev => ({
+        ...prev,
+        [provider]: { testing: false, ok: false, message: `❌ Erreur réseau : ${err.message}` }
+      }));
     }
   };
 
@@ -370,7 +489,7 @@ const Dashboard = () => {
       <h1 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1.5rem' }}>Tableau de Bord Administrateur</h1>
 
       {/* Superadmin Tab Navigation */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexWrap: 'wrap' }}>
         <button
           onClick={() => setMainTab('companies')}
           style={{
@@ -415,8 +534,29 @@ const Dashboard = () => {
             </span>
           )}
         </button>
+
+        <button
+          onClick={() => { setMainTab('ai'); fetchAiSettings(); }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.6rem',
+            padding: '0.75rem 1.25rem',
+            borderRadius: '8px',
+            border: 'none',
+            backgroundColor: mainTab === 'ai' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+            color: mainTab === 'ai' ? 'white' : 'var(--text-secondary)',
+            fontWeight: 600,
+            fontSize: '0.95rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: mainTab === 'ai' ? '0 4px 6px -1px rgba(59, 130, 246, 0.3)' : 'none'
+          }}
+        >
+          <Bot size={18} />
+          Configuration des IA
+        </button>
       </div>
 
+      {/* ONGLET 1 : ENTREPRISES & DECLARANTS */}
       {mainTab === 'companies' && (
         <div className="fade-in">
           {/* KPI Cards */}
@@ -542,6 +682,7 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* ONGLET 2 : DOCUMENTATION DOUANIERE */}
       {mainTab === 'documents' && (
         <div className="fade-in">
           {/* KPI Cards Documents */}
@@ -687,6 +828,318 @@ const Dashboard = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ONGLET 3 : CONFIGURATION DES IA & CLES D'API */}
+      {mainTab === 'ai' && (
+        <div className="fade-in">
+          {/* Header Info */}
+          <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '2rem', marginBottom: '2rem', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ padding: '0.9rem', borderRadius: '12px', backgroundColor: 'rgba(225, 29, 72, 0.1)' }}>
+                <Bot size={28} color="var(--accent-primary)" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text-primary)', fontWeight: 700 }}>
+                  Gestion des Modèles d'Intelligence Artificielle & Clés d'API
+                </h2>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  Configurez et sauvegardez directement les clés d'API de vos modèles. Les modifications prennent effet instantanément pour tous les utilisateurs (Web et Application Windows).
+                </p>
+              </div>
+            </div>
+
+            {/* Choix du Fournisseur Principal */}
+            <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
+              <label style={{ ...labelStyle, fontSize: '0.95rem', marginBottom: '0.8rem', color: 'var(--text-primary)' }}>
+                Moteur d'IA Prioritaire pour la Recherche Tarifaire :
+              </label>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                {/* Option Claude */}
+                <div 
+                  onClick={() => setAiSettings({ ...aiSettings, active_provider: 'claude' })}
+                  style={{ 
+                    padding: '1.2rem', borderRadius: '10px', cursor: 'pointer',
+                    border: aiSettings.active_provider === 'claude' ? '2px solid #e11d48' : '1px solid var(--border-color)',
+                    backgroundColor: aiSettings.active_provider === 'claude' ? 'rgba(225, 29, 72, 0.05)' : 'var(--bg-tertiary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>Anthropic Claude</strong>
+                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', backgroundColor: '#e11d48', color: 'white', fontWeight: 600 }}>Recommandé</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                    Excellente précision pour l'interprétation des règles douanières CEMAC et la justification tarifaire.
+                  </p>
+                </div>
+
+                {/* Option Gemini */}
+                <div 
+                  onClick={() => setAiSettings({ ...aiSettings, active_provider: 'gemini' })}
+                  style={{ 
+                    padding: '1.2rem', borderRadius: '10px', cursor: 'pointer',
+                    border: aiSettings.active_provider === 'gemini' ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                    backgroundColor: aiSettings.active_provider === 'gemini' ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-tertiary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>Google Gemini</strong>
+                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', backgroundColor: 'var(--accent-primary)', color: 'white', fontWeight: 600 }}>Rapide</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                    Modèles Gemini 2.5 Flash / Pro. Très rapide et performant sur les recherches courantes.
+                  </p>
+                </div>
+
+                {/* Option Groq */}
+                <div 
+                  onClick={() => setAiSettings({ ...aiSettings, active_provider: 'groq' })}
+                  style={{ 
+                    padding: '1.2rem', borderRadius: '10px', cursor: 'pointer',
+                    border: aiSettings.active_provider === 'groq' ? '2px solid #10b981' : '1px solid var(--border-color)',
+                    backgroundColor: aiSettings.active_provider === 'groq' ? 'rgba(16, 185, 129, 0.05)' : 'var(--bg-tertiary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>Groq Cloud</strong>
+                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', backgroundColor: '#10b981', color: 'white', fontWeight: 600 }}>Ultra-Vitesse</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                    Vitesse d'inférence instantanée avec les modèles open source Llama / Qwen.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Formulaire des Clés d'API */}
+          <form onSubmit={handleSaveAiSettings}>
+            <div style={{ display: 'grid', gap: '1.5rem', marginBottom: '2rem' }}>
+              
+              {/* Carte 1 : Anthropic Claude */}
+              <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.75rem', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <Cpu size={22} color="#e11d48" />
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 600 }}>Anthropic Claude API</h3>
+                  </div>
+                  {aiSettings.claude_api_key ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--success)', fontSize: '0.8rem', fontWeight: 600 }}>
+                      <CheckCircle size={14} /> Clé configurée
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Non configurée</span>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+                  <div style={{ flex: 2 }}>
+                    <label style={labelStyle}>Clé d'API Anthropic (sk-ant-api03-...)</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type={showKeys.claude ? 'text' : 'password'}
+                        style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }}
+                        placeholder="sk-ant-api03-..."
+                        value={aiSettings.claude_api_key}
+                        onChange={(e) => setAiSettings({ ...aiSettings, claude_api_key: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKeys({ ...showKeys, claude: !showKeys.claude })}
+                        title={showKeys.claude ? "Masquer la clé" : "Afficher la clé"}
+                        style={{ padding: '0 0.8rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                      >
+                        {showKeys.claude ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Modèle Claude</label>
+                    <select
+                      style={inputStyle}
+                      value={aiSettings.claude_model}
+                      onChange={(e) => setAiSettings({ ...aiSettings, claude_model: e.target.value })}
+                    >
+                      <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Le plus précis)</option>
+                      <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Ultra rapide)</option>
+                      <option value="claude-3-opus-20240229">Claude 3 Opus (Raisonnement approfondi)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleTestKey('claude')}
+                    disabled={testResults.claude?.testing || !aiSettings.claude_api_key}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.85rem', cursor: (!aiSettings.claude_api_key || testResults.claude?.testing) ? 'not-allowed' : 'pointer', color: 'var(--text-primary)' }}
+                  >
+                    <Zap size={14} color="#e11d48" />
+                    {testResults.claude?.testing ? "Test en cours..." : "Tester la clé Claude"}
+                  </button>
+
+                  {testResults.claude?.message && (
+                    <span style={{ fontSize: '0.85rem', color: testResults.claude?.ok ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
+                      {testResults.claude?.message}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Carte 2 : Google Gemini */}
+              <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.75rem', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <Bot size={22} color="var(--accent-primary)" />
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 600 }}>Google Gemini API</h3>
+                  </div>
+                  {aiSettings.gemini_api_key ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--success)', fontSize: '0.8rem', fontWeight: 600 }}>
+                      <CheckCircle size={14} /> Clé active
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Non configurée</span>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+                  <div style={{ flex: 2 }}>
+                    <label style={labelStyle}>Clé d'API Google AI Studio</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type={showKeys.gemini ? 'text' : 'password'}
+                        style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }}
+                        placeholder="AQ.Ab8RN6..."
+                        value={aiSettings.gemini_api_key}
+                        onChange={(e) => setAiSettings({ ...aiSettings, gemini_api_key: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKeys({ ...showKeys, gemini: !showKeys.gemini })}
+                        title={showKeys.gemini ? "Masquer la clé" : "Afficher la clé"}
+                        style={{ padding: '0 0.8rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                      >
+                        {showKeys.gemini ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Modèle Gemini</label>
+                    <select
+                      style={inputStyle}
+                      value={aiSettings.gemini_model}
+                      onChange={(e) => setAiSettings({ ...aiSettings, gemini_model: e.target.value })}
+                    >
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommandé)</option>
+                      <option value="gemini-2.5-pro">Gemini 2.5 Pro (Haute réflexion)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleTestKey('gemini')}
+                    disabled={testResults.gemini?.testing || !aiSettings.gemini_api_key}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.85rem', cursor: (!aiSettings.gemini_api_key || testResults.gemini?.testing) ? 'not-allowed' : 'pointer', color: 'var(--text-primary)' }}
+                  >
+                    <Zap size={14} color="var(--accent-primary)" />
+                    {testResults.gemini?.testing ? "Test en cours..." : "Tester la clé Gemini"}
+                  </button>
+
+                  {testResults.gemini?.message && (
+                    <span style={{ fontSize: '0.85rem', color: testResults.gemini?.ok ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
+                      {testResults.gemini?.message}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Carte 3 : Groq API */}
+              <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.75rem', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <Key size={22} color="#10b981" />
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 600 }}>Groq API</h3>
+                  </div>
+                  {aiSettings.groq_api_key ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--success)', fontSize: '0.8rem', fontWeight: 600 }}>
+                      <CheckCircle size={14} /> Clé active
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Non configurée</span>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={labelStyle}>Clé d'API Groq (gsk_...)</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type={showKeys.groq ? 'text' : 'password'}
+                      style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }}
+                      placeholder="gsk_..."
+                      value={aiSettings.groq_api_key}
+                      onChange={(e) => setAiSettings({ ...aiSettings, groq_api_key: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKeys({ ...showKeys, groq: !showKeys.groq })}
+                      title={showKeys.groq ? "Masquer la clé" : "Afficher la clé"}
+                      style={{ padding: '0 0.8rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                    >
+                      {showKeys.groq ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleTestKey('groq')}
+                    disabled={testResults.groq?.testing || !aiSettings.groq_api_key}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.85rem', cursor: (!aiSettings.groq_api_key || testResults.groq?.testing) ? 'not-allowed' : 'pointer', color: 'var(--text-primary)' }}
+                  >
+                    <Zap size={14} color="#10b981" />
+                    {testResults.groq?.testing ? "Test en cours..." : "Tester la clé Groq"}
+                  </button>
+
+                  {testResults.groq?.message && (
+                    <span style={{ fontSize: '0.85rem', color: testResults.groq?.ok ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
+                      {testResults.groq?.message}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Bouton d'enregistrement général */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <button
+                type="submit"
+                disabled={aiSettingsSaving}
+                className="premium-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.85rem 2rem', fontSize: '1rem', fontWeight: 600 }}
+              >
+                {aiSettingsSaving ? (
+                  <>
+                    <span className="spinner" style={{ width: '16px', height: '16px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}></span>
+                    Enregistrement...
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} /> Enregistrer la Configuration des IA
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
