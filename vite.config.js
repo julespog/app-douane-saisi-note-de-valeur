@@ -35,8 +35,9 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,woff,woff2}'],
+        globPatterns: ['**/*.{js,mjs,css,html,ico,png,svg,json,woff,woff2}'],
         navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/pdfjs\//, /\.pdf$/i, /^\/api\//, /^\/downloads\//],
         maximumFileSizeToCacheInBytes: 5000000,
         runtimeCaching: [
           {

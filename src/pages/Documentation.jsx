@@ -4,27 +4,30 @@ import CustomPDFViewer, { safeEncodePath } from '../components/CustomPDFViewer';
 import { usePDFDownloader } from '../hooks/usePDFDownloader';
 import { supabase } from '../supabaseClient';
 
-const FileTreeNode = ({ node, onSelectFile, selectedUrl }) => {
+const FileTreeNode = ({ node, onSelectFile, selectedUrl, forceOpen = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const isSelected = selectedUrl === node.url;
+  const isExpanded = forceOpen || isOpen;
 
   if (node.type === 'directory') {
+    const fileCount = node.children ? node.children.length : 0;
     return (
       <div style={{ marginBottom: '6px' }}>
         <div 
-          onClick={() => setIsOpen(!isOpen)}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', backgroundColor: isOpen ? 'var(--bg-tertiary)' : 'transparent', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.95rem', transition: 'background-color 0.2s' }}
-          onMouseOver={e => !isOpen && (e.currentTarget.style.backgroundColor = 'var(--bg-primary)')}
-          onMouseOut={e => !isOpen && (e.currentTarget.style.backgroundColor = 'transparent')}
+          onClick={() => setIsOpen(!isExpanded)}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', backgroundColor: isExpanded ? 'var(--bg-tertiary)' : 'transparent', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.95rem', transition: 'background-color 0.2s' }}
+          onMouseOver={e => !isExpanded && (e.currentTarget.style.backgroundColor = 'var(--bg-primary)')}
+          onMouseOut={e => !isExpanded && (e.currentTarget.style.backgroundColor = 'transparent')}
         >
-          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           <Folder size={18} color="var(--accent-primary)" />
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={node.name}>{node.name}</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400, marginLeft: '0.25rem' }}>({fileCount})</span>
           {node.isCustom && <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--accent-primary)', color: 'white', padding: '1px 6px', borderRadius: '4px', marginLeft: 'auto' }}>Admin</span>}
         </div>
-        {isOpen && (
+        {isExpanded && (
           <div style={{ paddingLeft: '1.5rem', marginTop: '4px', borderLeft: '2px solid var(--border-color)', marginLeft: '0.75rem' }}>
-            {node.children.map(child => <FileTreeNode key={child.path} node={child} onSelectFile={onSelectFile} selectedUrl={selectedUrl} />)}
+            {node.children.map(child => <FileTreeNode key={child.path} node={child} onSelectFile={onSelectFile} selectedUrl={selectedUrl} forceOpen={forceOpen} />)}
           </div>
         )}
       </div>
@@ -293,7 +296,7 @@ const Documentation = () => {
             ) : (
               <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
                 {displayedTree.map(node => (
-                  <FileTreeNode key={node.path} node={node} onSelectFile={setSelectedFile} selectedUrl={selectedFile?.url} />
+                  <FileTreeNode key={node.path} node={node} onSelectFile={setSelectedFile} selectedUrl={selectedFile?.url} forceOpen={Boolean(globalSearchTerm)} />
                 ))}
                 {displayedTree.length === 0 && <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '1rem' }}>Aucun document ne correspond à "{globalSearchTerm}".</p>}
               </div>
