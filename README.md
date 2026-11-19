@@ -1,16 +1,31 @@
-# React + Vite
+# Gnamatech — Système de Tarification et Notes de Détail CEMAC
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Application officielle d'assistance au dédouanement, classement tarifaire par Intelligence Artificielle et génération des notes de détail pour la zone CEMAC.
 
-Currently, two official plugins are available:
+* **Plateforme Web :** [https://gnamatech.com](https://gnamatech.com)
+* **Application Windows :** [Télécharger l'installateur officiel (.exe)](https://gnamatech.com/downloads/Gnamatech_Setup.exe)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 📖 Guide Développeur & Collaborateurs
+Consultez le fichier complet [PROJECT_GUIDE.md](./PROJECT_GUIDE.md) pour les instructions complètes :
+- Configuration de l'environnement de développement
+- Clés d'environnement `.env`
+- Architecture de la base de données Supabase et de l'IA
+- Déploiement web VPS et compilation Windows via GitHub Actions
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🚀 Démarrage Rapide
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+# 1. Cloner le projet
+git clone https://github.com/julespog/app-douane-saisi-note-de-valeur.git
+cd app-douane-saisi-note-de-valeur
+
+# 2. Installer les dépendances
+npm install
+
+# 3. Lancer en local
+npm run dev
+```
