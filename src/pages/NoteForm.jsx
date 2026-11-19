@@ -14,6 +14,7 @@ import { supabase, customFetch } from '../supabaseClient';
 import CustomPDFViewer from '../components/CustomPDFViewer';
 import { distributeTotals } from '../utils/weightDistribution';
 import ReactMarkdown from 'react-markdown';
+import { createPortal } from 'react-dom';
 
 const INITIAL_INFOS = {
   noDossier: '', noOT: '', noCDEMarque: '', noRepertoire: '',
@@ -1207,7 +1208,10 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                   )}
                 </div>
 
-                {/* FICHE IMPRIMABLE D'EXPERTISE IA (Masquée à l'écran, active lors de l'impression) */}
+                {/* FICHE IMPRIMABLE D'EXPERTISE IA (Masquée à l'écran, active lors de l'impression).
+                    Rendue directement dans <body> (portail) pour ne pas être coupée par les
+                    conteneurs à hauteur fixe / défilement de la page. */}
+                {createPortal(
                 <div id="ai-printable-sheet" style={{ display: 'none' }}>
                   <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: '12px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
@@ -1288,7 +1292,7 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
 
                   {/* Règles de classification appliquées */}
                   {aiResult.regles && (
-                    <div style={{ marginBottom: '24px', breakInside: 'avoid' }}>
+                    <div style={{ marginBottom: '24px' }}>
                       <div style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: '6px', marginBottom: '12px', letterSpacing: '0.5px' }}>
                         Règles de classification
                       </div>
@@ -1307,7 +1311,9 @@ Tu dois répondre avec un objet JSON valide contenant exactement ces 4 clés :
                       Généré via la plateforme Gnamatech
                     </div>
                   </div>
-                </div>
+                </div>,
+                document.body
+                )}
               </div>
             )}
           </div>
