@@ -61,7 +61,7 @@ const Dashboard = () => {
   const [aiSettings, setAiSettings] = useState({
     active_provider: 'claude',
     claude_api_key: '',
-    claude_model: 'claude-3-5-sonnet-20241022',
+    claude_model: 'claude-sonnet-4-6',
     gemini_api_key: '',
     gemini_model: 'gemini-2.5-flash',
     groq_api_key: ''
@@ -170,9 +170,9 @@ const Dashboard = () => {
         .single();
       if (data) {
         setAiSettings({
-          active_provider: data.active_provider || 'claude',
+          active_provider: 'claude', // Anthropic Claude uniquement
           claude_api_key: data.claude_api_key || '',
-          claude_model: data.claude_model || 'claude-3-5-sonnet-20241022',
+          claude_model: data.claude_model || 'claude-sonnet-4-6',
           gemini_api_key: data.gemini_api_key || '',
           gemini_model: data.gemini_model || 'gemini-2.5-flash',
           groq_api_key: data.groq_api_key || ''
@@ -866,55 +866,55 @@ const Dashboard = () => {
                   onClick={() => setAiSettings({ ...aiSettings, active_provider: 'claude' })}
                   style={{ 
                     padding: '1.2rem', borderRadius: '10px', cursor: 'pointer',
-                    border: aiSettings.active_provider === 'claude' ? '2px solid #e11d48' : '1px solid var(--border-color)',
-                    backgroundColor: aiSettings.active_provider === 'claude' ? 'rgba(225, 29, 72, 0.05)' : 'var(--bg-tertiary)',
+                    border: '2px solid #e11d48',
+                    backgroundColor: 'rgba(225, 29, 72, 0.05)',
                     transition: 'all 0.2s'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>Anthropic Claude</strong>
-                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', backgroundColor: '#e11d48', color: 'white', fontWeight: 600 }}>Recommandé</span>
+                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', backgroundColor: '#e11d48', color: 'white', fontWeight: 600 }}>Moteur Unique Actif</span>
                   </div>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                    Excellente précision pour l'interprétation des règles douanières CEMAC et la justification tarifaire.
+                    Excellente précision pour l'interprétation des règles douanières CEMAC et la justification tarifaire. Seul moteur actif.
                   </p>
                 </div>
 
-                {/* Option Gemini */}
+                {/* Option Gemini (Désactivé) */}
                 <div 
-                  onClick={() => setAiSettings({ ...aiSettings, active_provider: 'gemini' })}
                   style={{ 
-                    padding: '1.2rem', borderRadius: '10px', cursor: 'pointer',
-                    border: aiSettings.active_provider === 'gemini' ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                    backgroundColor: aiSettings.active_provider === 'gemini' ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-tertiary)',
+                    padding: '1.2rem', borderRadius: '10px', cursor: 'not-allowed',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    opacity: 0.5,
                     transition: 'all 0.2s'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>Google Gemini</strong>
-                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', backgroundColor: 'var(--accent-primary)', color: 'white', fontWeight: 600 }}>Rapide</span>
+                    <strong style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Google Gemini</strong>
+                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', backgroundColor: 'var(--text-muted)', color: 'white', fontWeight: 600 }}>Désactivé</span>
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                    Modèles Gemini 2.5 Flash / Pro. Très rapide et performant sur les recherches courantes.
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                    Moteur désactivé pour la recherche IA.
                   </p>
                 </div>
 
-                {/* Option Groq */}
+                {/* Option Groq (Désactivé) */}
                 <div 
-                  onClick={() => setAiSettings({ ...aiSettings, active_provider: 'groq' })}
                   style={{ 
-                    padding: '1.2rem', borderRadius: '10px', cursor: 'pointer',
-                    border: aiSettings.active_provider === 'groq' ? '2px solid #10b981' : '1px solid var(--border-color)',
-                    backgroundColor: aiSettings.active_provider === 'groq' ? 'rgba(16, 185, 129, 0.05)' : 'var(--bg-tertiary)',
+                    padding: '1.2rem', borderRadius: '10px', cursor: 'not-allowed',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    opacity: 0.5,
                     transition: 'all 0.2s'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>Groq Cloud</strong>
-                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', backgroundColor: '#10b981', color: 'white', fontWeight: 600 }}>Ultra-Vitesse</span>
+                    <strong style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Groq Cloud</strong>
+                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '20px', backgroundColor: 'var(--text-muted)', color: 'white', fontWeight: 600 }}>Désactivé</span>
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                    Vitesse d'inférence instantanée avec les modèles open source Llama / Qwen.
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                    Moteur désactivé pour la recherche IA.
                   </p>
                 </div>
               </div>
@@ -970,9 +970,13 @@ const Dashboard = () => {
                       value={aiSettings.claude_model}
                       onChange={(e) => setAiSettings({ ...aiSettings, claude_model: e.target.value })}
                     >
-                      <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Le plus précis)</option>
-                      <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Ultra rapide)</option>
-                      <option value="claude-3-opus-20240229">Claude 3 Opus (Raisonnement approfondi)</option>
+                      <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Recommandé - Très performant)</option>
+                      <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (Ultra-rapide)</option>
+                      <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
+                      <option value="claude-haiku-5-5">Claude Haiku 5.5</option>
+                      <option value="claude-fable-5-2">Claude Fable 5.2</option>
+                      <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                      <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
                     </select>
                   </div>
                 </div>

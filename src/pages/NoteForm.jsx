@@ -1027,7 +1027,7 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
 (si la certitude n'est pas élevée, conseille une demande de renseignement tarifaire préalable auprès de la douane)
 ### Informations manquantes
 (uniquement si des informations déterminantes manquent : questions à poser au déclarant)`;
-                  const apiBase = (typeof window !== 'undefined' && (window.__TAURI__ || window.location.origin.includes('localhost') || window.location.origin.includes('tauri'))) ? 'https://gnamatech.com' : '';
+                  const apiBase = (typeof window !== 'undefined' && !window.location.origin.includes('gnamatech.com')) ? 'https://gnamatech.com' : '';
                   customFetch(`${apiBase}/api/ai`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1042,7 +1042,7 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                     const foundImage = rawImage && !rawImage.startsWith('http') ? `${apiBase}${rawImage}` : rawImage;
                     const usedModel = data?.model || '';
                     supabase.from('ai_queries').insert({ company_id: user?.companyId || user?.company_id, user_id: user?.id, query: aiQuery, response: text }).then(({ error }) => { if (error) console.error('AI log error:', error); }).catch(err => console.error('AI log catch:', err));
-                    if (!text) { setAiResult({ code: '', libelle: '', explanation: '❌ Réponse vide de l\'API Gemini', imageUrl: '', model: '' }); return; }
+                    if (!text) { setAiResult({ code: '', libelle: '', explanation: '❌ Réponse vide de l\'API Claude (Anthropic)', imageUrl: '', model: '' }); return; }
 
                     let parsedCode = '';
                     let parsedLibelle = '';
