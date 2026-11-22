@@ -99,13 +99,13 @@ const NoteForm = () => {
   // Découpe l'explication Markdown de l'IA en sections (titres ###) :
   // - description : texte avant le 1er titre + section « Description détaillée »
   // - regles      : section « Règles de classification »
-  // - sections    : toutes les autres (Positions écartées, Niveau de certitude,
-  //                 Points de vigilance, Recommandation, Informations manquantes…)
+  // - sections    : autres sections autorisées (Niveau de certitude, Recommandation…)
   const splitClassificationRules = (markdown) => {
     const text = String(markdown || '');
     const headingRe = /^[ \t]*#{1,6}[ \t]*(?:\d+[.)][ \t]*)?\**[ \t]*([^\n#*][^\n]*?)\**[ \t]*$/gm;
     const isDescription = (t) => /^description/i.test(t);
     const isRegles = (t) => /^r[èeé]gles?\s+(?:g[ée]n[ée]rales\s+)?(?:de\s+classification|de\s+classement|interpr[ée]tatives)|^justification/i.test(t);
+    const isExcludedSection = (t) => /(position[s]?\s*[ée]cart[ée]e|point[s]?\s*de\s*vigilance|vigilance|information[s]?\s*manquante[s]?|manquant)/i.test(t);
     const matches = [...text.matchAll(headingRe)];
     if (matches.length === 0) return { description: text.trim(), regles: '', sections: [] };
 
@@ -118,13 +118,13 @@ const NoteForm = () => {
       if (!body) return;
       if (isDescription(title)) description = [description, body].filter(Boolean).join('\n\n');
       else if (isRegles(title)) regles = [regles, body].filter(Boolean).join('\n\n');
-      else if (/manquant/i.test(title) && /^[\s*_-]*(aucune|néant|neant|n\/a|rien)/i.test(body)) return;
+      else if (isExcludedSection(title)) return;
       else sections.push({ title, body });
     });
     return { description, regles, sections };
   };
 
-  // Couleur du bloc selon le titre de section (certitude, vigilance…)
+  // Couleur du bloc selon le titre de section (certitude, recommandation…)
   const aiSectionAccent = (title, body) => {
     if (/certitude/i.test(title)) {
       const lvl = String(body).replace(/[*_\s]/g, '').toLowerCase();
@@ -132,7 +132,6 @@ const NoteForm = () => {
       if (lvl.startsWith('moyen')) return '#d97706';
       if (lvl.startsWith('faible')) return '#dc2626';
     }
-    if (/vigilance|manquant/i.test(title)) return '#d97706';
     return '#2563eb';
   };
 
@@ -994,9 +993,8 @@ MÉTHODE
 1. Analyse la nature, la matière constitutive, la fonction et le degré d'élaboration du produit.
 2. Identifie la Section et le Chapitre, en citant les Notes applicables et leurs exclusions.
 3. Applique les RGI dans l'ordre, de la RGI 1 à la RGI 6, et indique à quelle règle le classement est arrêté et pourquoi.
-4. Présente les positions concurrentes envisageables et explique pourquoi tu les écartes.
-5. Cite les Notes explicatives, avis de classement OMD ou décisions pertinents. Signale toute référence dont tu n'es pas certain.
-6. Si une information déterminante manque, ne fais AUCUNE supposition : liste les questions à poser au déclarant dans la section « Informations manquantes », propose le classement le plus probable SOUS RÉSERVE et abaisse le niveau de certitude en conséquence.
+4. Cite les Notes explicatives, avis de classement OMD ou décisions pertinents. Signale toute référence dont tu n'es pas certain.
+5. Si une information déterminante manque, propose le classement le plus probable SOUS RÉSERVE et abaisse le niveau de certitude en conséquence.
 
 RÈGLES
 - Utilise la nomenclature SH édition 2022 et le TEC CEMAC ; précise l'édition utilisée. Ne cite AUCUNE autre législation (UE, Canada, etc.).
@@ -1012,21 +1010,15 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
 "code" : sous-position TEC CEMAC complète à 8 chiffres (ex : "87032110")
 "libelle" : libellé tarifaire officiel CEMAC de cette sous-position
 "taux" : taux DD (ex : "30%")
-"explanation" : texte Markdown contenant les sections suivantes, dans cet ordre et avec EXACTEMENT ces titres :
+"explanation" : texte Markdown contenant UNIQUEMENT les sections suivantes, dans cet ordre et avec EXACTEMENT ces titres :
 ### Description détaillée
 (nature, matière, fonction, degré d'élaboration ; Section et Chapitre avec leurs Notes et exclusions ; code SH 6 chiffres et son libellé officiel ; sous-position TEC CEMAC complète et son libellé ; édition SH utilisée)
 ### Règles de classification
 (RGI appliquées dans l'ordre de 1 à 6 en indiquant celle où le classement est arrêté et pourquoi ; Notes explicatives et avis OMD pertinents, en signalant toute référence incertaine)
-### Positions écartées
-(positions concurrentes et motif d'exclusion de chacune)
 ### Niveau de certitude
 (commence par « Élevé », « Moyen » ou « Faible », puis explique ; distingue le certain de l'interprétation)
-### Points de vigilance
-(risques de requalification, licences, normes, interdictions, taxes spécifiques, documents à prévoir)
 ### Recommandation
-(si la certitude n'est pas élevée, conseille une demande de renseignement tarifaire préalable auprès de la douane)
-### Informations manquantes
-(uniquement si des informations déterminantes manquent : questions à poser au déclarant)`;
+(si la certitude n'est pas élevée, conseille une demande de renseignement tarifaire préalable auprès de la douane)`;
                   const apiBase = (typeof window !== 'undefined' && !window.location.origin.includes('gnamatech.com')) ? 'https://gnamatech.com' : '';
                   customFetch(`${apiBase}/api/ai`, {
                     method: 'POST',
