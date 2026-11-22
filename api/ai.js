@@ -71,10 +71,11 @@ export default async function handler(req, res) {
       });
     }
 
-    const text = anthropicData?.content?.[0]?.text || '';
+    const textBlock = Array.isArray(anthropicData?.content) ? anthropicData.content.find(b => b.type === 'text') : null;
+    const text = textBlock ? textBlock.text : (anthropicData?.content?.[0]?.text || '');
     return res.status(200).json({
       candidates: [{ content: { parts: [{ text }] } }],
-      model: 'Claude (Anthropic)'
+      model: anthropicData?.model ? `Claude (${anthropicData.model})` : 'Claude (Anthropic)'
     });
   } catch (error) {
     console.error('Erreur Anthropic Claude Vercel :', error);
