@@ -381,6 +381,9 @@ input[type=number] {
     display: block !important;
     position: static !important;
     width: 100% !important;
+    box-sizing: border-box !important;
+    /* Réduction calculée avant impression pour tenir sur une seule page A4 (1 = taille normale) */
+    zoom: var(--ai-print-zoom, 1);
     margin: 0 !important;
     padding: 10mm 15mm !important;
     background: #ffffff !important;

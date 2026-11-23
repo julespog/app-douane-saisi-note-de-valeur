@@ -270,13 +270,48 @@ const NoteForm = () => {
     }
   };
 
+  // Impression de la fiche d'expertise IA : toujours sur UNE page A4.
+  // Le contenu n'est pas modifié : si la fiche dépasse la page, elle est réduite
+  // proportionnellement (comme « Ajuster à la page »), sinon elle garde sa taille normale.
+  const AI_PRINT_PAGE = { widthMm: 190, heightMm: 277, marginMm: 10 }; // A4 portrait, marges 10 mm
   const handlePrintAiResult = () => {
     if (!aiResult.code && !aiResult.explanation) return;
+    const sheet = document.getElementById('ai-printable-sheet');
+    let zoom = 1;
+    if (sheet) {
+      // Mesure hors écran au rendu d'impression. Avec un zoom z, la fiche occupe toute la
+      // largeur de la page : le texte se met en page sur une largeur 190/z mm puis est réduit
+      // de z. On cherche le plus grand z (texte le plus lisible) qui tient sur la page.
+      const saved = sheet.getAttribute('style') || '';
+      const pxPerMm = 96 / 25.4;
+      const availablePx = AI_PRINT_PAGE.heightMm * pxPerMm * 0.97; // petite marge de sécurité
+      const heightAt = (z) => {
+        sheet.setAttribute('style', `${saved};display:block;position:absolute;left:-20000px;top:0;visibility:hidden;width:${AI_PRINT_PAGE.widthMm / z}mm;padding:${10 / z}mm ${15 / z}mm;box-sizing:border-box;background:#fff;color:#0f172a;zoom:1`);
+        return sheet.scrollHeight * z;
+      };
+      if (heightAt(1) > availablePx) {
+        let lo = 0.3, hi = 1;
+        for (let i = 0; i < 12; i++) { const mid = (lo + hi) / 2; if (heightAt(mid) <= availablePx) lo = mid; else hi = mid; }
+        zoom = lo;
+      }
+      sheet.setAttribute('style', saved);
+    }
+    document.documentElement.style.setProperty('--ai-print-zoom', String(zoom));
+    // Format de page limité à cette impression (retiré ensuite pour ne pas toucher aux autres impressions)
+    const pageStyle = document.createElement('style');
+    pageStyle.id = 'ai-print-page-style';
+    pageStyle.textContent = `@page { size: A4 portrait; margin: ${AI_PRINT_PAGE.marginMm}mm; }`;
+    document.head.appendChild(pageStyle);
     document.body.classList.add('printing-ai-result');
-    window.print();
-    setTimeout(() => {
+    const cleanup = () => {
       document.body.classList.remove('printing-ai-result');
-    }, 1000);
+      document.getElementById('ai-print-page-style')?.remove();
+      document.documentElement.style.removeProperty('--ai-print-zoom');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+    setTimeout(cleanup, 1000);
   };
 
   // Lecteur PDF rapide (Code Douane / Reglementation)
