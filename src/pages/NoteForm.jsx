@@ -4,7 +4,7 @@ import {
   Search, Plus, Trash2, Save, Download, 
   Printer, BookOpen, FileText, CheckCircle, Package, CreditCard, AlertCircle, Folder, Lock, Copy, Bot, GraduationCap, RefreshCw, ClipboardCopy
 } from 'lucide-react';
-import { applyGroupingLogic } from '../utils/groupingLogic';
+import { applyGroupingLogic, applyCodeAddGroupingLogic, isCodeAddGroupingActive } from '../utils/groupingLogic';
 import { COUNTRIES } from '../utils/countries';
 import { useNavigate, useLocation } from 'react-router-dom';
 import NoteDocument from '../components/NoteDocument';
@@ -630,6 +630,11 @@ const NoteForm = () => {
     return number.toLocaleString('fr-FR').replace(/\s/g, '.');
   };
 
+  // Choix de la formule de regroupement : par codes additionnels si le Code Add de
+  // l'en-tête contient au moins 2 codes différents (taux alternatif), sinon formule actuelle.
+  const codeAddGroupingActive = isCodeAddGroupingActive(infos.codeAddEntete);
+  const runGrouping = (mapped) => (codeAddGroupingActive ? applyCodeAddGroupingLogic(mapped) : applyGroupingLogic(mapped));
+
   // Regroupement visuel en temps réel
   const visualGroups = React.useMemo(() => {
     if (articles.length === 0) return { map: {} };
@@ -642,7 +647,7 @@ const NoteForm = () => {
       valeurImposable: parseFloat(getArticleVStat(a.valeur))
     }));
     
-    const result = applyGroupingLogic(mappedArticles);
+    const result = runGrouping(mappedArticles);
     const map = {};
     
     let groupIndex = 0;
@@ -665,7 +670,7 @@ const NoteForm = () => {
     });
     
     return { map, result };
-  }, [articles, infos.tauxDevise, infos.devise, infos.fret, infos.assurance, valeurs]);
+  }, [articles, infos.tauxDevise, infos.devise, infos.fret, infos.assurance, valeurs, codeAddGroupingActive]);
 
   const [modalData, setModalData] = useState(null);
 
@@ -681,8 +686,8 @@ const NoteForm = () => {
       valeurImposable: parseFloat(getArticleVStat(a.valeur))
     }));
     
-    // Utiliser l'algorithme de regroupement
-    const result = applyGroupingLogic(mappedArticles);
+    // Utiliser l'algorithme de regroupement (par codes additionnels ou formule actuelle)
+    const result = runGrouping(mappedArticles);
     
     // Archiver la note finale dans la base de données via le contexte
     const archiveData = {
@@ -1867,6 +1872,13 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
 
       {/* ZONE BASSE : TABLEAU DES ARTICLES (100% de la largeur) */}
       <div style={{...cardStyle, padding: 0, overflow: 'hidden'}}>
+        {codeAddGroupingActive && articles.length > 0 && visualGroups.result && (
+          <div style={{ padding: '0.6rem 1rem', fontSize: '0.8rem', borderBottom: '1px solid var(--border-color)', backgroundColor: visualGroups.result.depasse ? 'rgba(217,119,6,0.12)' : 'rgba(37,99,235,0.08)', color: visualGroups.result.depasse ? '#d97706' : 'var(--text-secondary)' }}>
+            <strong>Regroupement par codes additionnels</strong> (Code Add en-tête : {infos.codeAddEntete}) — {articles.length} marchandise(s) → {visualGroups.result.articles.length} position(s), niveau {visualGroups.result.level}.
+            {' '}Taux alternatif : fixé par la douane selon le code additionnel.
+            {visualGroups.result.depasse && <> ⚠ Plus de 25 positions après le niveau 4.</>}
+          </div>
+        )}
         <div className="table-responsive-wrapper" style={{ maxHeight: '500px', overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: 'var(--bg-secondary)' }}>
@@ -1993,15 +2005,20 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                           {String(group.codeSH).padEnd(8, '0').substring(0, 8)} <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(Position fusionnée)</div>
                         </td>
                         <td style={{ padding: '1rem', fontWeight: 'bold', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={group.intitule}>{group.intitule}</td>
-                        <td style={{ padding: '1rem', fontWeight: 'bold' }}>{group.origine}</td>
+                        <td style={{ padding: '1rem', fontWeight: 'bold' }} title={group.originesFusionnees ? `Pays fusionnés : ${group.originesFusionnees.join(', ')}` : undefined}>
+                          {group.origine}
+                          {group.continent && <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 500 }}>{group.continent}{group.originesFusionnees?.length > 1 ? ` · ${group.originesFusionnees.length} pays` : ''}</div>}
+                        </td>
                         <td style={{ padding: '1rem', fontWeight: 'bold' }}>{group.quantite}</td>
                         <td style={{ padding: '1rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>{Number(group.valeur).toFixed(2)}</td>
                         <td style={{ padding: '1rem', fontWeight: 'bold' }}>{group.pBrut}</td>
                         <td style={{ padding: '1rem', fontWeight: 'bold' }}>{group.pNet}</td>
                         <td style={{ padding: '1rem', fontWeight: 'bold' }}>{group.colis}</td>
                         <td style={{ padding: '1rem', color: 'var(--success)', fontWeight: 'bold' }}>{formatNumberWithDots(group.valeurImposable)}</td>
-                        <td style={{ padding: '0.4rem' }}></td>
-                        <td style={{ padding: '1rem', fontWeight: 'bold' }}>{group.tauxDouane}%</td>
+                        <td style={{ padding: '0.4rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{group.tauxAlternatif ? group.codeAdditionnel : ''}</td>
+                        <td style={{ padding: '1rem', fontWeight: 'bold' }} title={group.tauxAlternatif ? 'Taux alternatif : fixé par le système de la douane selon le code additionnel' : undefined}>
+                          {group.tauxAlternatif ? <span style={{ color: '#d97706' }}>Alternatif</span> : `${group.tauxDouane}%`}
+                        </td>
                         <td style={{ padding: '1rem', fontWeight: 'bold' }}>{group.unite}</td>
                         <td style={{ padding: '1rem' }}></td>
                       </tr>

@@ -1,3 +1,5 @@
+import { getContinent } from './continents.js';
+
 /**
  * Algorithme de regroupement des positions tarifaires.
  * Le cahier des charges impose un maximum de 25 positions par note.
@@ -123,4 +125,69 @@ export const applyGroupingLogic = (articles) => {
     level: 4, 
     message: "Regroupement de Niveau 4 appliqué (Même Chapitre, Taux - Origine ignorée)." 
   };
+};
+
+/* ------------------------------------------------------------------------------------
+ * Regroupement PAR CODES ADDITIONNELS (formule distincte, la formule ci-dessus est inchangée).
+ * S'applique quand le Code Add de l'en-tête contient au moins 2 codes différents.
+ * Le taux de droit de douane devient « alternatif » (fixé par le système de la douane à
+ * partir du code additionnel) : il n'est PAS un critère de regroupement.
+ *   Niveau 1 : 6 premiers chiffres + pays d'origine + code additionnel
+ *   Niveau 2 : 6 premiers chiffres + continent     + code additionnel
+ *   Niveau 3 : 4 premiers chiffres + continent     + code additionnel
+ *   Niveau 4 : 2 premiers chiffres + continent     + code additionnel
+ * On s'arrête au premier niveau qui tient en 25 positions ; au-delà du niveau 4, on garde
+ * le niveau 4 avec un avertissement.
+ * ---------------------------------------------------------------------------------- */
+
+export const MAX_POSITIONS = 25;
+
+const codeAddOf = (a) => String(a?.codeAdditionnel ?? '').trim().toUpperCase() || '000';
+const cleanSH = (codeSH) => String(codeSH || '').replace(/[\s.]/g, '');
+
+/** Codes additionnels distincts d'un Code Add d'en-tête (ex. "605-603" → ['605', '603']). */
+export const getCodesAddEntete = (codeAddEntete) =>
+  [...new Set(String(codeAddEntete || '').split('-').map(s => s.trim().toUpperCase()).filter(Boolean))];
+
+/** La formule par codes additionnels s'applique-t-elle ? (au moins 2 codes différents en en-tête) */
+export const isCodeAddGroupingActive = (codeAddEntete) => getCodesAddEntete(codeAddEntete).length >= 2;
+
+const CODE_ADD_LEVELS = [
+  { level: 1, digits: 6, byContinent: false, label: '6 chiffres, origine, code additionnel' },
+  { level: 2, digits: 6, byContinent: true, label: '6 chiffres, continent, code additionnel' },
+  { level: 3, digits: 4, byContinent: true, label: '4 chiffres, continent, code additionnel' },
+  { level: 4, digits: 2, byContinent: true, label: '2 chiffres, continent, code additionnel' },
+];
+
+const groupForLevel = (articles, { digits, byContinent }) => {
+  const byId = new Map(articles.map(a => [a.id, a]));
+  const keyFn = (a) => `${cleanSH(a.codeSH).substring(0, digits)}|${byContinent ? getContinent(a.origine) : a.origine}|${codeAddOf(a)}`;
+
+  return mergeArticles(articles, keyFn).map(group => {
+    // Origine : celle de la marchandise dont on garde le code SH et l'intitulé
+    // (même règle de rétention que mergeArticles : code SH le plus grand).
+    const members = (group.originalIds || []).map(id => byId.get(id)).filter(Boolean);
+    if (members.length > 1) {
+      const retained = [...members].sort((a, b) => String(b.codeSH).localeCompare(String(a.codeSH)))[0];
+      group.origine = retained.origine;
+      group.originesFusionnees = [...new Set(members.map(m => m.origine).filter(Boolean))];
+    }
+    group.codeAdditionnel = codeAddOf(group);
+    group.continent = byContinent ? getContinent(group.origine) : undefined;
+    group.tauxAlternatif = true; // taux fixé par le système de la douane via le code additionnel
+    return group;
+  });
+};
+
+export const applyCodeAddGroupingLogic = (articles) => {
+  let last = null;
+  for (const cfg of CODE_ADD_LEVELS) {
+    const grouped = groupForLevel(articles, cfg);
+    last = { articles: grouped, level: cfg.level, mode: 'codesAdditionnels', tauxAlternatif: true,
+      message: `Regroupement par codes additionnels — Niveau ${cfg.level} (${cfg.label}). Taux alternatif : fixé par la douane selon le code additionnel.` };
+    if (grouped.length <= MAX_POSITIONS) return last;
+  }
+  last.message += ` ⚠ La note dépasse ${MAX_POSITIONS} positions : ${last.articles.length} lignes après le niveau 4.`;
+  last.depasse = true;
+  return last;
 };
