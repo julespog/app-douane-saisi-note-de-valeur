@@ -1,0 +1,206 @@
+[
+ {
+  "code": "0159",
+  "libelle": "Mise en libre pratique suite mainlevée de la douane"
+ },
+ {
+  "code": "1000",
+  "libelle": "Exportation définitive directe"
+ },
+ {
+  "code": "1021",
+  "libelle": "Exportation définitive aprés PA/Rembours"
+ },
+ {
+  "code": "1023",
+  "libelle": "Exportation définitive suite exportation temporaire"
+ },
+ {
+  "code": "1072",
+  "libelle": "Exportation définitive suite entrepôt d'exportation"
+ },
+ {
+  "code": "2100",
+  "libelle": "Exportation temporaire dans le cadre du perfectionnement passif"
+ },
+ {
+  "code": "2300",
+  "libelle": "Exportation temporaire pour retour en l'etat (foires, expositions...)"
+ },
+ {
+  "code": "2400",
+  "libelle": "Export.temp.pour objet appartenant aux voyageurs"
+ },
+ {
+  "code": "3000",
+  "libelle": "Réexportation"
+ },
+ {
+  "code": "3053",
+  "libelle": "Réexportation suite ATN pour réparation, essai ou expérience"
+ },
+ {
+  "code": "3054",
+  "libelle": "Réexportation suite admission temp or recherche pétrolière ou minière"
+ },
+ {
+  "code": "3055",
+  "libelle": "Réexportation suite ATN pour véhicule et embarcation"
+ },
+ {
+  "code": "3056",
+  "libelle": "Réexportation suite ATN pour exécution des travaux"
+ },
+ {
+  "code": "3057",
+  "libelle": "Réexportation suite impot.temp.pour objets appartenant aux voyageurs"
+ },
+ {
+  "code": "3058",
+  "libelle": "Réexportation suite admission Temporaire Normal\"STANDBY\""
+ },
+ {
+  "code": "3059",
+  "libelle": "Réexportation suite admission temporaire spéciale"
+ },
+ {
+  "code": "3071",
+  "libelle": "*Réexportation suite mise en entrepôt"
+ },
+ {
+  "code": "3073",
+  "libelle": "Réexportation suite mise en entrepôt"
+ },
+ {
+  "code": "4000",
+  "libelle": "Mise à la consommation directe"
+ },
+ {
+  "code": "4050",
+  "libelle": "Mise à la consommation suite ATN pour transformation"
+ },
+ {
+  "code": "4053",
+  "libelle": "Mise à la consommation suite ATN pour réparation essai ou expérience"
+ },
+ {
+  "code": "4054",
+  "libelle": "Mise à la consommation suite ATN pour recherche pétrolière ou minière"
+ },
+ {
+  "code": "4055",
+  "libelle": "Mise à la consommation suite ATN pour véhicule et embarcation"
+ },
+ {
+  "code": "4056",
+  "libelle": "Mise à la consommation suite ATN pour exécution de travaux"
+ },
+ {
+  "code": "4059",
+  "libelle": "Mise à la consommation suite ATS"
+ },
+ {
+  "code": "4071",
+  "libelle": "*Mise à la consommation suite à entrepôt"
+ },
+ {
+  "code": "4073",
+  "libelle": "Mise à la consommation suite à entrepôt"
+ },
+ {
+  "code": "5000",
+  "libelle": "Admission temporaire pour transformation"
+ },
+ {
+  "code": "5300",
+  "libelle": "ATN pour réparation,essai ou expérience"
+ },
+ {
+  "code": "5400",
+  "libelle": "ATN pour recherche pétrolière ou minière"
+ },
+ {
+  "code": "5500",
+  "libelle": "ATN pour véhicule et embarcation"
+ },
+ {
+  "code": "5600",
+  "libelle": "ATN pour exécution de travaux"
+ },
+ {
+  "code": "5671",
+  "libelle": "*ATN pour exécution des travaux suite mise en entrepôt"
+ },
+ {
+  "code": "5700",
+  "libelle": "Import.temp.des objets appartenant aux voyageurs"
+ },
+ {
+  "code": "5800",
+  "libelle": "Admission Temporaire normale\"STAND BY\"."
+ },
+ {
+  "code": "5900",
+  "libelle": "Admission temporaire spéciale"
+ },
+ {
+  "code": "6000",
+  "libelle": "Réimportation Directe"
+ },
+ {
+  "code": "6021",
+  "libelle": "Réimportation aprés perfectionnement passif"
+ },
+ {
+  "code": "6023",
+  "libelle": "Réimportation aprés retour en l'état"
+ },
+ {
+  "code": "6024",
+  "libelle": "Réimportation suite export.temp.pour objets appartenant aux voyageurs"
+ },
+ {
+  "code": "7100",
+  "libelle": "*Mise en entrepôt suite importation directe"
+ },
+ {
+  "code": "7200",
+  "libelle": "Mise en entrepôt d'exportation de marchandise nationale"
+ },
+ {
+  "code": "7300",
+  "libelle": "Mise en entrepôt sous douane des produits importés"
+ },
+ {
+  "code": "7350",
+  "libelle": "Mise en entrepôt suite ATN pour transformation"
+ },
+ {
+  "code": "8000",
+  "libelle": "Transit national à l'import"
+ },
+ {
+  "code": "8100",
+  "libelle": "Transit national à l'export"
+ },
+ {
+  "code": "8200",
+  "libelle": "Transit international"
+ },
+ {
+  "code": "9000",
+  "libelle": "Procédure accélérée de dédouanement"
+ },
+ {
+  "code": "9058",
+  "libelle": "*Liquidation d'office ATS"
+ },
+ {
+  "code": "9500",
+  "libelle": "Avitaillement"
+ },
+ {
+  "code": "9573",
+  "libelle": "Avitaillement suite mise en entrepôt"
+ }
+]

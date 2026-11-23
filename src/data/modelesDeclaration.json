@@ -1,0 +1,67 @@
+[
+ {
+  "code": "EX1",
+  "libelle": "Exportation définitive",
+  "series": "E L"
+ },
+ {
+  "code": "EX2",
+  "libelle": "Exportation temporaire",
+  "series": "E L"
+ },
+ {
+  "code": "EX3",
+  "libelle": "Réexportation",
+  "series": "E L"
+ },
+ {
+  "code": "EX7",
+  "libelle": "Mise en entrepôt d'une marchandise nationale ou nationalisée.",
+  "series": "S L"
+ },
+ {
+  "code": "EX8",
+  "libelle": "Transit à l'exportation",
+  "series": "T L"
+ },
+ {
+  "code": "EX9",
+  "libelle": "Autres procédures d'exportation(Avitaillement,comptoirs de vente)",
+  "series": "E L"
+ },
+ {
+  "code": "IM0",
+  "libelle": "Mise en libre pratique suite ATS, droits et taxes déja acquités",
+  "series": "C L"
+ },
+ {
+  "code": "IM4",
+  "libelle": "Mise à la consommation",
+  "series": "C L"
+ },
+ {
+  "code": "IM5",
+  "libelle": "Admission temporaire",
+  "series": "S L"
+ },
+ {
+  "code": "IM6",
+  "libelle": "Réimportation",
+  "series": "C L"
+ },
+ {
+  "code": "IM7",
+  "libelle": "Mise en entrepôt d'une marchandise importée",
+  "series": "S L"
+ },
+ {
+  "code": "IM8",
+  "libelle": "Transit à l'importation",
+  "series": "T L"
+ },
+ {
+  "code": "IM9",
+  "libelle": "Autres procédures d'importation",
+  "series": "P L"
+ }
+]

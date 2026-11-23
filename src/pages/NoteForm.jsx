@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { 
   Search, Plus, Trash2, Save, Download, 
@@ -13,6 +13,20 @@ import { UserContext } from '../context/UserContext';
 import { supabase, customFetch } from '../supabaseClient';
 import CustomPDFViewer from '../components/CustomPDFViewer';
 import CodeAdditionnelSelect from '../components/CodeAdditionnelSelect';
+import CodeListSelect from '../components/CodeListSelect';
+import REGIMES_ETENDUS from '../data/regimesEtendus.json';
+import MODELES_DECLARATION from '../data/modelesDeclaration.json';
+import CODES_ADDITIONNELS from '../data/codesAdditionnels.json';
+
+const MODELE_OPTIONS = MODELES_DECLARATION.map(m => ({ code: m.code, libelle: m.libelle, detail: m.series ? `Séries ${m.series}` : '' }));
+const REGIME_OPTIONS = REGIMES_ETENDUS.map(r => ({ code: r.code, libelle: r.libelle }));
+const CODE_ADD_OPTIONS = CODES_ADDITIONNELS.map(c => ({ code: c.code, libelle: c.libelle, detail: c.baseLegale }));
+const CODES_ADD_CONNUS = new Set(CODES_ADDITIONNELS.map(c => c.code));
+// Code Add d'en-tête valide : 1 à 4 codes officiels séparés par « - » (ex. 605-603).
+const isCodeAddEnteteValide = (v) => {
+  const parts = String(v || '').split('-').map(s => s.trim().toUpperCase()).filter(Boolean);
+  return parts.length > 0 && parts.length <= MAX_CODES_ADD_ENTETE && parts.every(p => CODES_ADD_CONNUS.has(p));
+};
 import { distributeTotals } from '../utils/weightDistribution';
 import ReactMarkdown from 'react-markdown';
 import { createPortal } from 'react-dom';
@@ -24,7 +38,38 @@ const INITIAL_INFOS = {
   typeLieu: 'Provenance', provenance: 'Afghanistan', nombreNatureColis: '', poidsBrut: '', poidsNet: '', noVolOuVol: '',
   devise: 'EUR', tauxDevise: '655.957', modeReglement: '01',
   typeOperation: 'IM4', modeTaxation: '4000 / 000', modeTransport: 'MER', incoterm: 'FOB',
+  // « Mode de Taxation » = Régime étendu + Code Add de l'en-tête (recomposé automatiquement,
+  // conservé pour la note imprimée et les archives). codeAddManuel : l'utilisateur a saisi
+  // lui-même le Code Add ; sinon il est déduit des codes additionnels des marchandises.
+  regimeEtendu: '4000', codeAddEntete: '000', codeAddManuel: false,
   autoColis: true, modePoids: 'auto'
+};
+
+// Nombre maximum de codes additionnels affichables dans le Code Add de l'en-tête.
+const MAX_CODES_ADD_ENTETE = 4;
+
+// Codes additionnels distincts utilisés par les marchandises, dans l'ordre d'apparition.
+const getCodesAddUtilises = (articles) => {
+  const seen = [];
+  (articles || []).forEach(a => {
+    const c = String(a?.codeAdditionnel ?? '').trim().toUpperCase() || '000';
+    if (!seen.includes(c)) seen.push(c);
+  });
+  return seen;
+};
+
+// Complète un en-tête chargé (brouillon, archive) : les anciennes notes n'ont que
+// « modeTaxation » (ex. "4000 / 605-603") ; on le découpe en Régime étendu + Code Add,
+// en gardant le Code Add tel qu'il avait été saisi (mode manuel).
+const normalizeInfos = (dInfos) => {
+  const merged = { ...INITIAL_INFOS, ...dInfos };
+  if (dInfos && dInfos.regimeEtendu === undefined) {
+    const [reg, add] = String(dInfos.modeTaxation || '').split('/').map(s => s.trim());
+    merged.regimeEtendu = reg || INITIAL_INFOS.regimeEtendu;
+    merged.codeAddEntete = add || '000';
+    merged.codeAddManuel = Boolean(add);
+  }
+  return merged;
 };
 
 const INITIAL_VALEURS = {
@@ -63,13 +108,13 @@ const NoteForm = () => {
     // Si on a les données d'un document cliqué (Brouillon ou Archive), on les charge
     if (location.state?.draftData) {
       const { infos: dInfos, valeurs: dVal, articles: dArt } = location.state.draftData;
-      if (dInfos) setInfos({...INITIAL_INFOS, ...dInfos});
+      if (dInfos) setInfos(normalizeInfos(dInfos));
       if (dVal) setValeurs({...INITIAL_VALEURS, ...dVal});
       if (dArt) setArticles(dArt);
     } else if (location.state?.archiveData) {
       const { infos: dInfos, valeurs: dVal } = location.state.archiveData;
       const dArt = location.state.archiveData.rawArticles || location.state.archiveData.articles;
-      if (dInfos) setInfos({...INITIAL_INFOS, ...dInfos});
+      if (dInfos) setInfos(normalizeInfos(dInfos));
       if (dVal) setValeurs({...INITIAL_VALEURS, ...dVal});
       if (dArt) setArticles(dArt);
     } else {
@@ -77,13 +122,38 @@ const NoteForm = () => {
       const savedDraft = localStorage.getItem(`noteDraft_${user?.companyId || 'default'}`);
       if (savedDraft) {
         const { infos: dInfos, valeurs: dVal, articles: dArt } = JSON.parse(savedDraft);
-        if (dInfos) setInfos({...INITIAL_INFOS, ...dInfos});
+        if (dInfos) setInfos(normalizeInfos(dInfos));
         if (dVal) setValeurs({...INITIAL_VALEURS, ...dVal});
         if (dArt) setArticles(dArt);
       }
     }
   }, [location.state, user]);
-  
+
+  // Code Add de l'en-tête : récapitulatif automatique des codes additionnels des
+  // marchandises (chaque code une seule fois, 4 au maximum, séparés par « - »),
+  // sauf si l'utilisateur l'a saisi manuellement. « Mode de Taxation » est recomposé
+  // à partir du Régime étendu et du Code Add (utilisé par la note imprimée et les archives).
+  const codesAddUtilises = useMemo(() => getCodesAddUtilises(articles), [articles]);
+  const codesAddHorsEntete = codesAddUtilises.slice(MAX_CODES_ADD_ENTETE);
+
+  // Régime étendu : son 1er chiffre correspond au numéro du modèle (EX1 → 1xxx, IM4 → 4xxx…).
+  // Les régimes du modèle choisi sont proposés en premier ; les autres restent possibles.
+  const modeDigit = (String(infos.typeOperation || '').match(/(\d)\s*$/) || [])[1] ?? '';
+  const regimeGroup = useCallback((o) => (modeDigit !== '' && o.code[0] === modeDigit ? 0 : 1), [modeDigit]);
+  const regimeWarning = modeDigit !== '' && /^\d{4}$/.test(String(infos.regimeEtendu || '')) && infos.regimeEtendu[0] !== modeDigit
+    ? `Régime inhabituel pour le modèle ${infos.typeOperation} (attendu : ${modeDigit}xxx)`
+    : '';
+  useEffect(() => {
+    setInfos(prev => {
+      const codeAdd = prev.codeAddManuel
+        ? prev.codeAddEntete
+        : (codesAddUtilises.length ? codesAddUtilises.slice(0, MAX_CODES_ADD_ENTETE).join('-') : '000');
+      const modeTaxation = `${prev.regimeEtendu || ''} / ${codeAdd || '000'}`;
+      if (codeAdd === prev.codeAddEntete && modeTaxation === prev.modeTaxation) return prev;
+      return { ...prev, codeAddEntete: codeAdd, modeTaxation };
+    });
+  }, [codesAddUtilises, infos.codeAddManuel, infos.regimeEtendu, infos.codeAddEntete]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
 
@@ -942,8 +1012,54 @@ const NoteForm = () => {
                 </div>
               </div>
               <div><label style={labelStyle}>Mode Règlement</label><input style={inputStyle} name="modeReglement" value={infos.modeReglement} onChange={handleInfosChange}/></div>
-              <div><label style={labelStyle}>Mode d'opération</label><input style={inputStyle} name="typeOperation" value={infos.typeOperation} onChange={handleInfosChange} /></div>
-              <div><label style={labelStyle}>Mode de Taxation</label><input style={inputStyle} name="modeTaxation" value={infos.modeTaxation} onChange={handleInfosChange} /></div>
+              <div>
+                <label style={labelStyle}>Mode d'opération</label>
+                <CodeListSelect
+                  options={MODELE_OPTIONS} noun="modèles de déclaration" placeholder="IM4"
+                  style={inputStyle} showLabel
+                  value={infos.typeOperation}
+                  onChange={(v) => setInfos(prev => ({ ...prev, typeOperation: v.replace(/\s+/g, '') }))}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Régime étendu</label>
+                <CodeListSelect
+                  options={REGIME_OPTIONS} noun="régimes étendus" placeholder="4000"
+                  style={inputStyle} showLabel
+                  value={infos.regimeEtendu}
+                  onChange={(v) => setInfos(prev => ({ ...prev, regimeEtendu: v }))}
+                  group={regimeGroup}
+                  firstGroupLabel={modeDigit !== '' ? `Régimes du modèle ${infos.typeOperation}` : undefined}
+                  otherGroupLabel={modeDigit !== '' ? 'Autres régimes' : undefined}
+                  warning={regimeWarning}
+                />
+              </div>
+              <div>
+                <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Code Add</span>
+                  {infos.codeAddManuel ? (
+                    <button
+                      type="button"
+                      onClick={() => setInfos(prev => ({ ...prev, codeAddManuel: false }))}
+                      title="Revenir au calcul automatique à partir des codes additionnels des marchandises"
+                      style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '0 6px', fontSize: '0.68rem', color: 'var(--accent-primary)', cursor: 'pointer', textTransform: 'none' }}
+                    >↺ Auto</button>
+                  ) : (
+                    <span style={{ fontSize: '0.66rem', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'none' }}>auto</span>
+                  )}
+                </label>
+                <CodeListSelect
+                  options={CODE_ADD_OPTIONS} noun="codes additionnels" placeholder="000"
+                  style={inputStyle}
+                  value={infos.codeAddEntete}
+                  onChange={(v) => setInfos(prev => ({ ...prev, codeAddEntete: v, codeAddManuel: true }))}
+                  isKnown={isCodeAddEnteteValide}
+                  warning={codesAddHorsEntete.length && !infos.codeAddManuel
+                    ? `${codesAddUtilises.length} codes utilisés : seuls les ${MAX_CODES_ADD_ENTETE} premiers sont repris (non repris : ${codesAddHorsEntete.join(', ')})`
+                    : ''}
+                  showLabel
+                />
+              </div>
               <div>
                 <label style={labelStyle}>Mode Transport</label>
                 <select style={inputStyle} name="modeTransport" value={infos.modeTransport} onChange={handleInfosChange}>
