@@ -20,8 +20,10 @@ const CodeListSelect = ({
   options, value, onChange, style, compact = false, showLabel = false,
   placeholder = '', noun = 'codes', group, firstGroupLabel, otherGroupLabel, warning, onFocusExtra,
   isKnown, // (valeur) => bool : valeur acceptée sans avertissement même si hors liste (ex. « 605-603 »)
+  multi = false, maxSelected = 4, separator = '-', // sélection multiple : codes joints par le séparateur
 }) => {
   const current = String(value ?? '');
+  const parts = multi ? current.split(separator).map(s => s.trim().toUpperCase()).filter(Boolean) : [];
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
@@ -84,12 +86,28 @@ const CodeListSelect = ({
     listRef.current?.querySelector(`[data-idx="${highlight}"]`)?.scrollIntoView({ block: 'nearest' });
   }, [highlight]);
 
-  const select = (code) => { onChange(code); setQuery(''); setOpen(false); };
+  // Codes déjà choisis (mode multiple), sans le morceau en cours de frappe s'il n'est pas un code.
+  const chosen = multi ? parts.filter((p, i) => i < parts.length - 1 || index.has(p) || !query) : [];
+  const full = multi && chosen.length >= maxSelected;
+
+  const select = (code) => {
+    if (!multi) { onChange(code); setQuery(''); setOpen(false); return; }
+    // Multiple : un clic ajoute le code, un second clic le retire ; la liste reste ouverte.
+    let next;
+    if (chosen.includes(code)) next = chosen.filter(c => c !== code);
+    else if (chosen.length < maxSelected) next = [...chosen, code];
+    else return;
+    onChange(next.length ? next.join(separator) : '000');
+    setQuery('');
+    setNavigated(false);
+    inputRef.current?.focus();
+  };
 
   const handleInput = (e) => {
     const v = e.target.value.toUpperCase();
     onChange(v);            // saisie manuelle : la valeur tapée est conservée
-    setQuery(v);
+    // En mode multiple, on filtre sur le code en cours de frappe (après le dernier séparateur).
+    setQuery(multi ? (v.split(separator).pop() || '').trim() : v);
     setHighlight(0);
     setNavigated(false);
     if (!open) setOpen(true);
@@ -132,10 +150,13 @@ const CodeListSelect = ({
         />
       </div>
 
-      {showLabel && (
-        <div style={{ fontSize: '0.72rem', marginTop: '0.25rem', color: warnMsg ? '#d97706' : 'var(--text-muted)', lineHeight: 1.3 }}>
-          {info ? info.libelle : ''}
-          {warnMsg && <span style={{ display: 'block' }}>{info ? '⚠ ' : ''}{warnMsg}</span>}
+      {showLabel && (info || warnMsg) && (
+        // Une seule ligne (texte complet au survol) pour garder les champs alignés.
+        <div
+          title={[info?.libelle, warnMsg].filter(Boolean).join('\n')}
+          style={{ fontSize: '0.72rem', marginTop: '0.25rem', color: warnMsg ? '#d97706' : 'var(--text-muted)', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+        >
+          {warnMsg ? `⚠ ${warnMsg}` : info.libelle}
         </div>
       )}
 
@@ -145,6 +166,14 @@ const CodeListSelect = ({
           onMouseDown={(e) => e.preventDefault()}
           style={{ position: 'fixed', left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight, overflowY: 'auto', zIndex: 10000, backgroundColor: 'var(--bg-secondary, #1e1e1e)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.35)', padding: '4px' }}
         >
+          {multi && (
+            <div style={{ padding: '6px 10px', fontSize: '0.72rem', fontWeight: 600, color: full ? '#d97706' : 'var(--accent-primary)' }}>
+              Sélection : {chosen.length}/{maxSelected}{chosen.length ? ` — ${chosen.join(separator)}` : ''}
+              <span style={{ display: 'block', fontWeight: 400, color: 'var(--text-muted)' }}>
+                {full ? `Maximum atteint : retirez un code pour en ajouter un autre.` : 'Cliquez un code pour l\'ajouter, recliquez pour le retirer.'}
+              </span>
+            </div>
+          )}
           <div style={{ padding: '6px 10px', fontSize: '0.7rem', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)', marginBottom: '4px' }}>
             {query
               ? `${results.length} résultat(s) pour « ${query} »${results.some(r => r.code === query) ? '' : ' — cliquez un code, ou Entrée pour garder votre saisie'}`
@@ -157,7 +186,8 @@ const CodeListSelect = ({
           )}
           {results.map((o, i) => {
             const active = i === highlight;
-            const selected = o.code === current;
+            const selected = multi ? chosen.includes(o.code) : o.code === current;
+            const disabled = multi && full && !selected;
             return (
               <div key={o.code}>
                 {group && i === 0 && firstOtherIdx !== 0 && firstGroupLabel && <div style={sectionStyle}>{firstGroupLabel}</div>}
@@ -166,8 +196,13 @@ const CodeListSelect = ({
                   data-idx={i}
                   onMouseEnter={() => setHighlight(i)}
                   onClick={() => select(o.code)}
-                  style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '7px 10px', borderRadius: '6px', cursor: 'pointer', backgroundColor: active ? 'var(--bg-tertiary)' : 'transparent', borderLeft: selected ? '3px solid var(--accent-primary)' : '3px solid transparent' }}
+                  style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '7px 10px', borderRadius: '6px', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1, backgroundColor: active ? 'var(--bg-tertiary)' : 'transparent', borderLeft: selected ? '3px solid var(--accent-primary)' : '3px solid transparent' }}
                 >
+                  {multi && (
+                    <span style={{ width: '16px', height: '16px', marginTop: '1px', flexShrink: 0, borderRadius: '4px', border: `1.5px solid ${selected ? 'var(--accent-primary)' : 'var(--border-color)'}`, backgroundColor: selected ? 'var(--accent-primary)' : 'transparent', color: '#fff', fontSize: '11px', lineHeight: '13px', textAlign: 'center' }}>
+                      {selected ? '✓' : ''}
+                    </span>
+                  )}
                   <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem', color: 'var(--accent-primary)', minWidth: '38px' }}>{o.code}</span>
                   <span style={{ flex: 1, fontSize: '0.8rem', color: 'var(--text-primary)', lineHeight: 1.35 }}>
                     {o.libelle}

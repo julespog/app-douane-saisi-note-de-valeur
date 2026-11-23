@@ -1001,7 +1001,8 @@ const NoteForm = () => {
               <h2 style={sectionTitleStyle}><CreditCard size={18} color="var(--accent-primary)" /> Devise de règlement</h2>
             </div>
 
-            <div className="grid-mobile-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem' }}>
+            {/* Tous les champs sur une seule ligne (empilés seulement sur mobile) */}
+            <div className="grid-mobile-1 devise-reglement-row" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,0.8fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,0.8fr)', gap: '0.6rem', alignItems: 'start' }}>
               <div>
                 <label style={labelStyle}>Devise / Taux</label>
                 <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -1051,6 +1052,7 @@ const NoteForm = () => {
                 <CodeListSelect
                   options={CODE_ADD_OPTIONS} noun="codes additionnels" placeholder="000"
                   style={inputStyle}
+                  multi maxSelected={MAX_CODES_ADD_ENTETE}
                   value={infos.codeAddEntete}
                   onChange={(v) => setInfos(prev => ({ ...prev, codeAddEntete: v, codeAddManuel: true }))}
                   isKnown={isCodeAddEnteteValide}
