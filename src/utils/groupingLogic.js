@@ -184,7 +184,7 @@ export const applyCodeAddGroupingLogic = (articles) => {
   for (const cfg of CODE_ADD_LEVELS) {
     const grouped = groupForLevel(articles, cfg);
     last = { articles: grouped, level: cfg.level, mode: 'codesAdditionnels', tauxAlternatif: true,
-      message: `Regroupement par codes additionnels — Niveau ${cfg.level} (${cfg.label}). Taux alternatif : fixé par la douane selon le code additionnel.` };
+      message: `Regroupement par codes additionnels — Niveau ${cfg.level} (${cfg.label}). Taux fixé par la douane selon le code additionnel.` };
     if (grouped.length <= MAX_POSITIONS) return last;
   }
   last.message += ` ⚠ La note dépasse ${MAX_POSITIONS} positions : ${last.articles.length} lignes après le niveau 4.`;

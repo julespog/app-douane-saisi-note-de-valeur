@@ -1875,7 +1875,7 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
         {codeAddGroupingActive && articles.length > 0 && visualGroups.result && (
           <div style={{ padding: '0.6rem 1rem', fontSize: '0.8rem', borderBottom: '1px solid var(--border-color)', backgroundColor: visualGroups.result.depasse ? 'rgba(217,119,6,0.12)' : 'rgba(37,99,235,0.08)', color: visualGroups.result.depasse ? '#d97706' : 'var(--text-secondary)' }}>
             <strong>Regroupement par codes additionnels</strong> (Code Add en-tête : {infos.codeAddEntete}) — {articles.length} marchandise(s) → {visualGroups.result.articles.length} position(s), niveau {visualGroups.result.level}.
-            {' '}Taux alternatif : fixé par la douane selon le code additionnel.
+            {' '}Taux fixé par la douane selon le code additionnel.
             {visualGroups.result.depasse && <> ⚠ Plus de 25 positions après le niveau 4.</>}
           </div>
         )}
@@ -2016,8 +2016,8 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                         <td style={{ padding: '1rem', fontWeight: 'bold' }}>{group.colis}</td>
                         <td style={{ padding: '1rem', color: 'var(--success)', fontWeight: 'bold' }}>{formatNumberWithDots(group.valeurImposable)}</td>
                         <td style={{ padding: '0.4rem', fontWeight: 'bold', fontFamily: 'monospace' }}>{group.tauxAlternatif ? group.codeAdditionnel : ''}</td>
-                        <td style={{ padding: '1rem', fontWeight: 'bold' }} title={group.tauxAlternatif ? 'Taux alternatif : fixé par le système de la douane selon le code additionnel' : undefined}>
-                          {group.tauxAlternatif ? <span style={{ color: '#d97706' }}>Alternatif</span> : `${group.tauxDouane}%`}
+                        <td style={{ padding: '1rem', fontWeight: 'bold' }} title={group.tauxAlternatif ? 'Taux fixé par le système de la douane selon le code additionnel' : undefined}>
+                          {group.tauxAlternatif ? <span style={{ color: 'var(--text-muted)' }}>—</span> : `${group.tauxDouane}%`}
                         </td>
                         <td style={{ padding: '1rem', fontWeight: 'bold' }}>{group.unite}</td>
                         <td style={{ padding: '1rem' }}></td>
