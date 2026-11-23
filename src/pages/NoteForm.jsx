@@ -1193,7 +1193,7 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                   customFetch(`${apiBase}/api/ai`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt, query: aiQuery })
+                    body: JSON.stringify({ prompt: prompt, query: aiQuery, companyId: user?.companyId || user?.company_id || null, companyName: user?.company?.name || null, userId: user?.id || null, userName: user?.name || null })
                   })
                   .then(async r => {
                     if (r.status === 429) { const errBody = await r.text(); setAiResult({ code: '', libelle: '', explanation: `❌ Quota dépassé (429): ${errBody.substring(0, 100)}`, imageUrl: '' }); return; }

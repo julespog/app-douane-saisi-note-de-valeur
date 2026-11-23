@@ -5,15 +5,17 @@ import { handleExternalLinkClick } from '../utils/openExternal';
 
 /**
  * Suivi des dépenses IA (Anthropic Claude) — page d'administration.
- * Données officielles d'Anthropic (API « Usage and Cost Analytics »), lues par le service IA
- * du serveur (GET /api/ai/costs) avec une clé d'administration stockée uniquement sur le
- * serveur. Les chiffres arrivent avec 4 à 24 h de décalage ; le solde de crédit restant
- * n'est pas fourni par l'API (lien vers la console Anthropic).
+ * Suivi INTERNE : le service IA du serveur enregistre la consommation de tokens renvoyée par
+ * Claude à chaque recherche (fichier privé du serveur) et l'estime en dollars avec les tarifs
+ * publics d'Anthropic. Le compte Anthropic étant individuel, l'API officielle de coûts n'est
+ * pas disponible. Le solde restant se lit dans la console Anthropic (lien).
  */
-const CONSOLE_BILLING_URL = 'https://console.anthropic.com/settings/billing';
-const CONSOLE_ADMIN_KEYS_URL = 'https://console.anthropic.com/settings/admin-keys';
+const CONSOLE_BILLING_URL = 'https://platform.claude.com/settings/billing';
 
-const usd = (n) => `${(Number(n) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
+const usd = (n) => {
+  const v = Number(n) || 0;
+  return `${v.toLocaleString('fr-FR', { minimumFractionDigits: v > 0 && v < 0.1 ? 3 : 2, maximumFractionDigits: v > 0 && v < 0.1 ? 3 : 2 })} $`;
+};
 const num = (n) => (Number(n) || 0).toLocaleString('fr-FR');
 const fmtDateTime = (iso) => {
   if (!iso) return '—';
@@ -38,6 +40,32 @@ const Card = ({ label, value, hint }) => (
   </div>
 );
 
+const th = { padding: '0.4rem', textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 };
+const td = { padding: '0.45rem', color: 'var(--text-primary)' };
+
+const Table = ({ title, rows, firstCol, renderFirst }) => (
+  rows?.length > 0 ? (
+    <div style={{ marginTop: '1.25rem' }}>
+      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>{title}</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+        <thead>
+          <tr><th style={th}>{firstCol}</th><th style={th}>Recherches</th><th style={th}>Tokens entrée / sortie</th><th style={{ ...th, textAlign: 'right' }}>Dépense estimée</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.id || r.model || i} style={{ borderTop: '1px solid var(--border-color)' }}>
+              <td style={td}>{renderFirst(r)}</td>
+              <td style={td}>{num(r.requests)}</td>
+              <td style={td}>{num(r.inputTokens)} / {num(r.outputTokens)}</td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{usd(r.usd)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  ) : null
+);
+
 const AiCostsPanel = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,14 +76,14 @@ const AiCostsPanel = () => {
     try {
       const r = await customFetch(`${apiBase()}/api/ai/costs${refresh ? '?refresh=1' : ''}`, { method: 'GET' });
       const body = await r.json().catch(() => ({}));
-      if (!r.ok) return { data: body.configured === false ? body : null, error: body.error || `Erreur ${r.status}` };
+      if (!r.ok) return { data: null, error: body.error || `Erreur ${r.status}` };
       return { data: body, error: '' };
     } catch {
       return { data: null, error: 'Service de suivi des dépenses injoignable.' };
     }
   }, []);
 
-  // Bouton « Actualiser » : force une nouvelle lecture chez Anthropic
+  // Bouton « Actualiser »
   const refresh = async () => {
     setLoading(true);
     const res = await fetchCosts(true);
@@ -71,6 +99,7 @@ const AiCostsPanel = () => {
 
   const days = data?.last30?.days || [];
   const maxDay = Math.max(0.0001, ...days.map(d => d.usd));
+  const empty = data && !data.trackingSince;
 
   return (
     <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.5rem 2rem', marginTop: '2rem', boxShadow: 'var(--shadow-sm)' }}>
@@ -80,43 +109,37 @@ const AiCostsPanel = () => {
           <div>
             <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700 }}>Suivi des dépenses IA (Claude)</h3>
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Chiffres officiels d'Anthropic, en dollars US. Mise à jour par Anthropic avec 4 à 24 h de décalage.
+              Estimation en dollars US à partir de la consommation réelle de chaque recherche et des tarifs publics d'Anthropic. Mise à jour immédiate.
             </p>
           </div>
         </div>
-        {data?.configured && (
-          <button type="button" onClick={refresh} disabled={loading}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '0.5rem 0.9rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: loading ? 'wait' : 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
-            <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Actualiser
-          </button>
-        )}
+        <button type="button" onClick={refresh} disabled={loading}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '0.5rem 0.9rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: loading ? 'wait' : 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+          <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Actualiser
+        </button>
       </div>
 
       {loading && !data && <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Chargement des dépenses…</div>}
 
-      {!loading && data?.configured === false && (
-        <div style={{ padding: '1rem 1.2rem', borderRadius: '10px', border: '1px dashed var(--border-color)', backgroundColor: 'var(--bg-tertiary)', fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          <strong style={{ color: 'var(--text-primary)' }}>Suivi non encore activé.</strong> Il faut une <strong>clé d'administration Anthropic</strong> (<code>sk-ant-admin…</code>),
-          différente de la clé de l'IA, créée par un administrateur du compte dans la console Anthropic ({' '}
-          <ExtLink href={CONSOLE_ADMIN_KEYS_URL}>Admin keys</ExtLink>{' '}). Pour des raisons de sécurité, elle s'installe
-          <strong> uniquement sur le serveur</strong> (fichier protégé), jamais dans cette page.
-          <div style={{ marginTop: '0.5rem' }}>En attendant, le solde et les factures sont consultables ici : <ExtLink href={CONSOLE_BILLING_URL}>Console Anthropic – Facturation</ExtLink></div>
-        </div>
-      )}
-
-      {error && data?.configured !== false && (
+      {error && (
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', padding: '0.9rem 1rem', borderRadius: '10px', backgroundColor: 'rgba(217,119,6,0.1)', color: '#d97706', fontSize: '0.86rem' }}>
           <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '1px' }} /> {error}
         </div>
       )}
 
-      {data?.configured && !data.error && (
+      {data && !error && (
         <>
+          {empty && (
+            <div style={{ padding: '0.8rem 1rem', marginBottom: '1rem', borderRadius: '10px', border: '1px dashed var(--border-color)', backgroundColor: 'var(--bg-tertiary)', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              Le suivi est actif : les dépenses apparaîtront ici dès la prochaine recherche IA. Les recherches faites avant la mise en place du suivi ne sont pas comptabilisées.
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.8rem' }}>
-            <Card label="Aujourd'hui" value={usd(data.today?.usd)} hint="partiel (décalage Anthropic)" />
-            <Card label="Mois en cours" value={usd(data.month?.usd)} hint={`depuis le ${shortDay(data.month?.since)}`} />
-            <Card label="Mois précédent" value={usd(data.previousMonth?.usd)} />
-            <Card label="30 derniers jours" value={usd(data.last30?.usd)} hint={`${num(data.usage30?.requests)} requêtes`} />
+            <Card label="Aujourd'hui" value={usd(data.today?.usd)} hint={`${num(data.today?.requests)} recherche(s)`} />
+            <Card label="Mois en cours" value={usd(data.month?.usd)} hint={`${num(data.month?.requests)} recherche(s) depuis le ${shortDay(data.month?.since)}`} />
+            <Card label="Mois précédent" value={usd(data.previousMonth?.usd)} hint={`${num(data.previousMonth?.requests)} recherche(s)`} />
+            <Card label="30 derniers jours" value={usd(data.last30?.usd)} hint={`${num(data.last30?.requests)} recherche(s) · ${data.last30?.requests ? usd(data.last30.usd / data.last30.requests) : '—'} / recherche`} />
           </div>
 
           {/* Dépenses jour par jour (30 jours) */}
@@ -124,8 +147,8 @@ const AiCostsPanel = () => {
             <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Dépenses par jour (30 derniers jours, UTC)</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '120px', padding: '0.5rem', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)' }}>
               {days.map(d => (
-                <div key={d.date} title={`${shortDay(d.date)} : ${usd(d.usd)}${d.partiel ? ' (partiel)' : ''}`}
-                  style={{ flex: 1, minWidth: '4px', height: `${Math.max(2, (d.usd / maxDay) * 100)}%`, borderRadius: '3px 3px 0 0', backgroundColor: d.partiel ? 'rgba(225,29,72,0.4)' : 'var(--accent-primary)', opacity: d.usd > 0 ? 1 : 0.25 }} />
+                <div key={d.date} title={`${shortDay(d.date)} : ${usd(d.usd)}${d.partiel ? ' (en cours)' : ''}`}
+                  style={{ flex: 1, minWidth: '4px', height: `${Math.max(2, (d.usd / maxDay) * 100)}%`, borderRadius: '3px 3px 0 0', backgroundColor: d.partiel ? 'rgba(225,29,72,0.55)' : 'var(--accent-primary)', opacity: d.usd > 0 ? 1 : 0.25 }} />
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
@@ -133,33 +156,16 @@ const AiCostsPanel = () => {
             </div>
           </div>
 
-          {/* Répartition par modèle */}
-          {data.byModel?.length > 0 && (
-            <table style={{ width: '100%', marginTop: '1.25rem', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                  <th style={{ padding: '0.4rem' }}>Modèle (30 jours)</th><th style={{ padding: '0.4rem' }}>Requêtes</th><th style={{ padding: '0.4rem' }}>Tokens entrée / sortie</th><th style={{ padding: '0.4rem', textAlign: 'right' }}>Dépense</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.byModel.map(m => {
-                  const u = (data.usage30?.byModel || []).find(x => x.model === m.model);
-                  return (
-                    <tr key={m.model} style={{ borderTop: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
-                      <td style={{ padding: '0.45rem', fontFamily: 'monospace' }}>{m.model}</td>
-                      <td style={{ padding: '0.45rem' }}>{u ? num(u.requests) : '—'}</td>
-                      <td style={{ padding: '0.45rem' }}>{u ? `${num(u.inputTokens)} / ${num(u.outputTokens)}` : '—'}</td>
-                      <td style={{ padding: '0.45rem', textAlign: 'right', fontWeight: 700 }}>{usd(m.usd)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+          <Table title="Par entreprise (mois en cours)" rows={data.byCompany} firstCol="Entreprise" renderFirst={r => r.name} />
+          <Table title="Par utilisateur (mois en cours, 20 premiers)" rows={data.byUser} firstCol="Utilisateur"
+            renderFirst={r => <>{r.name}{r.company ? <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}> · {r.company}</span> : null}</>} />
+          <Table title="Par modèle (30 derniers jours)" rows={data.byModel} firstCol="Modèle" renderFirst={r => <span style={{ fontFamily: 'monospace' }}>{r.model}</span>} />
 
           <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            Données Anthropic complètes jusqu'au {fmtDateTime(data.refreshedAt)} · calculées le {fmtDateTime(data.generatedAt)}{data.cached ? ' (cache 15 min)' : ''}.
-            Montants avant crédits/avoirs. Solde restant et factures : <ExtLink href={CONSOLE_BILLING_URL}>Console Anthropic – Facturation</ExtLink>
+            Suivi depuis le {fmtDateTime(data.trackingSince)} · calculé le {fmtDateTime(data.generatedAt)}.
+            {data.unpricedRequests > 0 && <> {num(data.unpricedRequests)} recherche(s) avec un modèle au tarif inconnu (non chiffrées).</>}
+            {' '}Estimation : la facture réelle peut légèrement différer (arrondis, remises, taxes).
+            {' '}Solde restant et factures : <ExtLink href={CONSOLE_BILLING_URL}>Console Anthropic – Facturation</ExtLink>
           </div>
         </>
       )}
