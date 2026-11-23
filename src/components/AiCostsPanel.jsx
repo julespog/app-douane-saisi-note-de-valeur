@@ -17,6 +17,11 @@ const usd = (n) => {
   return `${v.toLocaleString('fr-FR', { minimumFractionDigits: v > 0 && v < 0.1 ? 3 : 2, maximumFractionDigits: v > 0 && v < 0.1 ? 3 : 2 })} $`;
 };
 const num = (n) => (Number(n) || 0).toLocaleString('fr-FR');
+const fcfaFmt = (usdValue, rate) => {
+  if (!rate) return '— FCFA';
+  const v = (Number(usdValue) || 0) * rate;
+  return `${v.toLocaleString('fr-FR', { minimumFractionDigits: v > 0 && v < 10 ? 2 : 0, maximumFractionDigits: v > 0 && v < 10 ? 2 : 0 })} FCFA`;
+};
 const fmtDateTime = (iso) => {
   if (!iso) return '—';
   try { return new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return iso; }
@@ -32,10 +37,11 @@ const ExtLink = ({ href, children }) => (
   </a>
 );
 
-const Card = ({ label, value, hint }) => (
+const Card = ({ label, value, sub, hint }) => (
   <div style={{ padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-tertiary)' }}>
     <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, color: 'var(--text-muted)' }}>{label}</div>
     <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.3rem', fontFamily: 'monospace' }}>{value}</div>
+    {sub && <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{sub}</div>}
     {hint && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{hint}</div>}
   </div>
 );
@@ -43,13 +49,13 @@ const Card = ({ label, value, hint }) => (
 const th = { padding: '0.4rem', textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 };
 const td = { padding: '0.45rem', color: 'var(--text-primary)' };
 
-const Table = ({ title, rows, firstCol, renderFirst }) => (
+const Table = ({ title, rows, firstCol, renderFirst, rate }) => (
   rows?.length > 0 ? (
     <div style={{ marginTop: '1.25rem' }}>
       <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>{title}</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
         <thead>
-          <tr><th style={th}>{firstCol}</th><th style={th}>Recherches</th><th style={th}>Tokens entrée / sortie</th><th style={{ ...th, textAlign: 'right' }}>Dépense estimée</th></tr>
+          <tr><th style={th}>{firstCol}</th><th style={th}>Recherches</th><th style={th}>Tokens entrée / sortie</th><th style={{ ...th, textAlign: 'right' }}>Dépense (FCFA)</th><th style={{ ...th, textAlign: 'right' }}>Dépense ($)</th></tr>
         </thead>
         <tbody>
           {rows.map((r, i) => (
@@ -57,7 +63,8 @@ const Table = ({ title, rows, firstCol, renderFirst }) => (
               <td style={td}>{renderFirst(r)}</td>
               <td style={td}>{num(r.requests)}</td>
               <td style={td}>{num(r.inputTokens)} / {num(r.outputTokens)}</td>
-              <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{usd(r.usd)}</td>
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{fcfaFmt(r.usd, rate)}</td>
+              <td style={{ ...td, textAlign: 'right', color: 'var(--text-secondary)' }}>{usd(r.usd)}</td>
             </tr>
           ))}
         </tbody>
@@ -100,6 +107,8 @@ const AiCostsPanel = () => {
   const days = data?.last30?.days || [];
   const maxDay = Math.max(0.0001, ...days.map(d => d.usd));
   const empty = data && !data.trackingSince;
+  const rate = data?.fx?.usdToXaf || null;
+  const both = (v) => ({ value: fcfaFmt(v, rate), sub: usd(v) });
 
   return (
     <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '1.5rem 2rem', marginTop: '2rem', boxShadow: 'var(--shadow-sm)' }}>
@@ -109,7 +118,7 @@ const AiCostsPanel = () => {
           <div>
             <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700 }}>Suivi des dépenses IA (Claude)</h3>
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Estimation en dollars US à partir de la consommation réelle de chaque recherche et des tarifs publics d'Anthropic. Mise à jour immédiate.
+              Estimation en francs CFA et en dollars US, à partir de la consommation réelle de chaque recherche et des tarifs publics d'Anthropic (facturés en dollars). Mise à jour immédiate.
             </p>
           </div>
         </div>
@@ -136,10 +145,10 @@ const AiCostsPanel = () => {
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.8rem' }}>
-            <Card label="Aujourd'hui" value={usd(data.today?.usd)} hint={`${num(data.today?.requests)} recherche(s)`} />
-            <Card label="Mois en cours" value={usd(data.month?.usd)} hint={`${num(data.month?.requests)} recherche(s) depuis le ${shortDay(data.month?.since)}`} />
-            <Card label="Mois précédent" value={usd(data.previousMonth?.usd)} hint={`${num(data.previousMonth?.requests)} recherche(s)`} />
-            <Card label="30 derniers jours" value={usd(data.last30?.usd)} hint={`${num(data.last30?.requests)} recherche(s) · ${data.last30?.requests ? usd(data.last30.usd / data.last30.requests) : '—'} / recherche`} />
+            <Card label="Aujourd'hui" {...both(data.today?.usd)} hint={`${num(data.today?.requests)} recherche(s)`} />
+            <Card label="Mois en cours" {...both(data.month?.usd)} hint={`${num(data.month?.requests)} recherche(s) depuis le ${shortDay(data.month?.since)}`} />
+            <Card label="Mois précédent" {...both(data.previousMonth?.usd)} hint={`${num(data.previousMonth?.requests)} recherche(s)`} />
+            <Card label="30 derniers jours" {...both(data.last30?.usd)} hint={`${num(data.last30?.requests)} recherche(s) · ${data.last30?.requests ? fcfaFmt(data.last30.usd / data.last30.requests, rate) : '—'} / recherche`} />
           </div>
 
           {/* Dépenses jour par jour (30 jours) */}
@@ -147,7 +156,7 @@ const AiCostsPanel = () => {
             <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Dépenses par jour (30 derniers jours, UTC)</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '120px', padding: '0.5rem', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)' }}>
               {days.map(d => (
-                <div key={d.date} title={`${shortDay(d.date)} : ${usd(d.usd)}${d.partiel ? ' (en cours)' : ''}`}
+                <div key={d.date} title={`${shortDay(d.date)} : ${fcfaFmt(d.usd, rate)} (${usd(d.usd)})${d.partiel ? ' — en cours' : ''}`}
                   style={{ flex: 1, minWidth: '4px', height: `${Math.max(2, (d.usd / maxDay) * 100)}%`, borderRadius: '3px 3px 0 0', backgroundColor: d.partiel ? 'rgba(225,29,72,0.55)' : 'var(--accent-primary)', opacity: d.usd > 0 ? 1 : 0.25 }} />
               ))}
             </div>
@@ -156,13 +165,14 @@ const AiCostsPanel = () => {
             </div>
           </div>
 
-          <Table title="Par entreprise (mois en cours)" rows={data.byCompany} firstCol="Entreprise" renderFirst={r => r.name} />
-          <Table title="Par utilisateur (mois en cours, 20 premiers)" rows={data.byUser} firstCol="Utilisateur"
+          <Table title="Par entreprise (mois en cours)" rows={data.byCompany} rate={rate} firstCol="Entreprise" renderFirst={r => r.name} />
+          <Table title="Par utilisateur (mois en cours, 20 premiers)" rows={data.byUser} rate={rate} firstCol="Utilisateur"
             renderFirst={r => <>{r.name}{r.company ? <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}> · {r.company}</span> : null}</>} />
-          <Table title="Par modèle (30 derniers jours)" rows={data.byModel} firstCol="Modèle" renderFirst={r => <span style={{ fontFamily: 'monospace' }}>{r.model}</span>} />
+          <Table title="Par modèle (30 derniers jours)" rows={data.byModel} rate={rate} firstCol="Modèle" renderFirst={r => <span style={{ fontFamily: 'monospace' }}>{r.model}</span>} />
 
           <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
             Suivi depuis le {fmtDateTime(data.trackingSince)} · calculé le {fmtDateTime(data.generatedAt)}.
+            {rate && <> Taux : 1 $ = {rate.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} FCFA{data.fx?.date ? ` (${data.fx.date.split('-').reverse().join('/')})` : ''} — {data.fx?.source}{data.fx?.approximatif ? ' — taux approximatif (source indisponible)' : ''}.</>}
             {data.unpricedRequests > 0 && <> {num(data.unpricedRequests)} recherche(s) avec un modèle au tarif inconnu (non chiffrées).</>}
             {' '}Estimation : la facture réelle peut légèrement différer (arrondis, remises, taxes).
             {' '}Solde restant et factures : <ExtLink href={CONSOLE_BILLING_URL}>Console Anthropic – Facturation</ExtLink>
