@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext, useRef, useCallback, useMemo } 
 import * as XLSX from 'xlsx';
 import { 
   Search, Plus, Trash2, Save, Download, 
-  Printer, BookOpen, FileText, CheckCircle, Package, CreditCard, AlertCircle, Folder, Lock, Copy, Bot, GraduationCap, RefreshCw, ClipboardCopy
+  Printer, BookOpen, FileText, CheckCircle, Package, CreditCard, AlertCircle, Folder, Lock, Copy, Bot, GraduationCap, RefreshCw, ClipboardCopy, ExternalLink
 } from 'lucide-react';
 import { applyGroupingLogic, applyCodeAddGroupingLogic, isCodeAddGroupingActive } from '../utils/groupingLogic';
 import { COUNTRIES } from '../utils/countries';
@@ -14,6 +14,7 @@ import { supabase, customFetch } from '../supabaseClient';
 import CustomPDFViewer from '../components/CustomPDFViewer';
 import CodeAdditionnelSelect from '../components/CodeAdditionnelSelect';
 import CodeListSelect from '../components/CodeListSelect';
+import { safeExternalUrl, urlHostname, handleExternalLinkClick } from '../utils/openExternal';
 import REGIMES_ETENDUS from '../data/regimesEtendus.json';
 import MODELES_DECLARATION from '../data/modelesDeclaration.json';
 import CODES_ADDITIONNELS from '../data/codesAdditionnels.json';
@@ -1156,6 +1157,9 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
                     const rawImage = data?.imageUrl || '';
                     const foundImage = rawImage && !rawImage.startsWith('http') ? `${apiBase}${rawImage}` : rawImage;
+                    // Page d'où provient l'image (lien « Source ») et son titre, renvoyés par le service IA
+                    const imageSource = safeExternalUrl(data?.imageSource);
+                    const imageTitle = typeof data?.imageTitle === 'string' ? data.imageTitle : '';
                     const usedModel = data?.model || '';
                     supabase.from('ai_queries').insert({ company_id: user?.companyId || user?.company_id, user_id: user?.id, query: aiQuery, response: text }).then(({ error }) => { if (error) console.error('AI log error:', error); }).catch(err => console.error('AI log catch:', err));
                     if (!text) { setAiResult({ code: '', libelle: '', explanation: '❌ Réponse vide de l\'API Claude (Anthropic)', imageUrl: '', model: '' }); return; }
@@ -1218,7 +1222,7 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                     }
 
                     const { description, regles, sections } = splitClassificationRules(parsedExplanation);
-                    setAiResult({ code: parsedCode, libelle: parsedLibelle, taux: parsedTaux, explanation: description, regles, sections, imageUrl: foundImage, model: usedModel });
+                    setAiResult({ code: parsedCode, libelle: parsedLibelle, taux: parsedTaux, explanation: description, regles, sections, imageUrl: foundImage, imageSource, imageTitle, model: usedModel });
                   })
                   .catch((err) => setAiResult({ code: '', libelle: '', explanation: `Erreur réseau : ${err.message}`, imageUrl: '', model: '' }))
                   .finally(() => setAiLoading(false));
@@ -1268,6 +1272,19 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                         />
                         <div style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', padding: '2px 5px', fontSize: '0.65rem', color: '#fff', pointerEvents: 'none' }}>🔍 Agrandir</div>
                       </div>
+                      {aiResult.imageSource && (
+                        <a
+                          href={aiResult.imageSource}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => handleExternalLinkClick(e, aiResult.imageSource)}
+                          title={`Ouvrir la page d'où provient l'image :\n${aiResult.imageTitle ? aiResult.imageTitle + '\n' : ''}${aiResult.imageSource}`}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', marginTop: '6px', width: '130px', boxSizing: 'border-box', padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--accent-primary)', backgroundColor: 'transparent', fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-primary)', textDecoration: 'none', cursor: 'pointer' }}
+                        >
+                          <ExternalLink size={13} style={{ flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{urlHostname(aiResult.imageSource)}</span>
+                        </a>
+                      )}
                       {aiImageZoomed && (
                         <div
                           onClick={() => setAiImageZoomed(false)}
@@ -1280,6 +1297,20 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                               style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 8px 40px rgba(0,0,0,0.7)', display: 'block' }}
                             />
                             <div style={{ textAlign: 'center', color: '#fff', marginTop: '10px', fontSize: '0.9rem', opacity: 0.8 }}>{aiQuery || "Produit"}</div>
+                            {aiResult.imageSource && (
+                              <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                                <a
+                                  href={aiResult.imageSource}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => handleExternalLinkClick(e, aiResult.imageSource)}
+                                  title={aiResult.imageSource}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: '0.85rem', textDecoration: 'none', cursor: 'pointer' }}
+                                >
+                                  Voir la page source : {urlHostname(aiResult.imageSource)} <ExternalLink size={14} />
+                                </a>
+                              </div>
+                            )}
                             <button
                               onClick={(e) => { e.stopPropagation(); setAiImageZoomed(false); }}
                               style={{ position: 'absolute', top: '-14px', right: '-14px', background: '#E51E4D', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#fff', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}
@@ -1481,8 +1512,15 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                     )}
 
                     {aiResult.imageUrl && (
-                      <div style={{ width: '120px', height: '90px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1', flexShrink: 0 }}>
-                        <img src={aiResult.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <div style={{ width: '120px', flexShrink: 0 }}>
+                        <div style={{ width: '120px', height: '90px', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1' }}>
+                          <img src={aiResult.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        {aiResult.imageSource && (
+                          <div style={{ fontSize: '9px', color: '#64748b', marginTop: '3px', wordBreak: 'break-all', lineHeight: 1.2 }}>
+                            Source : {urlHostname(aiResult.imageSource)}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
