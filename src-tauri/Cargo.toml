@@ -1,6 +1,6 @@
 [package]
 name = "gnamatech"
-version = "1.0.0"
+version = "1.0.1"
 description = "Gnamatech - Generation des notes de detail -zone CEMAC"
 authors = ["you"]
 license = ""
