@@ -1,0 +1,764 @@
+[
+ {
+  "code": "000",
+  "libelle": "Aucun code additionnel (régime de droit commun)",
+  "ancienCode": "",
+  "baseLegale": ""
+ },
+ {
+  "code": "100",
+  "libelle": "Objets et produits destinés à l'usage officiel des chefs d'Etat étrangers séjournant au Gabon",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "110",
+  "libelle": "Objets et produits destinés à l'usage officiel des missions diplomatiques",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "111",
+  "libelle": "Mission diplomatique: effets personnels des Agents diplomatiques",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "112",
+  "libelle": "Mission diplomatique: effets personnels des Personnels administratifs et techniques lors de la première installation",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "113",
+  "libelle": "Mission diplomatique: effets personnels et familiaux des experts et représentants",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "114",
+  "libelle": "Poste consulaire: effet personnels des personnels consulaires",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "120",
+  "libelle": "Objets destinés à l'usage officiel des postes consulaires",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "121",
+  "libelle": "Poste consulaire: effets personnels des personnels consulaires lors de la première installation",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "122",
+  "libelle": "Poste consulaire: effets personnels des Personnels administratifs et techniques lors de la première installation",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "123",
+  "libelle": "Poste consulaire: effets personnels du personnel de service lors de la première installation",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "124",
+  "libelle": "Poste consulaire: effets personnels des fonctionnaires consulaires",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "125",
+  "libelle": "Poste consulaire: effets personnels et familiaux des experts et représentants",
+  "ancienCode": "100",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "130",
+  "libelle": "Objets destinés à l'usage officiel des organisations internationales",
+  "ancienCode": "106",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "131",
+  "libelle": "Organisations internationales: effets personnels et familiaux des assimilés et des experts",
+  "ancienCode": "106",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "132",
+  "libelle": "Organisations internationales: effets personnels et familiaux des membres et des experts",
+  "ancienCode": "106",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "140",
+  "libelle": "Importations des forces armées étrangères",
+  "ancienCode": "101",
+  "baseLegale": "Traité instituant un partenariat de défense entre la République Française et la République Gabonaise"
+ },
+ {
+  "code": "150",
+  "libelle": "Importations des forces armées nationales",
+  "ancienCode": "102",
+  "baseLegale": ""
+ },
+ {
+  "code": "200",
+  "libelle": "Marchandises en retour dans le territoire douanier",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "210",
+  "libelle": "Importations destinées à l'OAPI",
+  "ancienCode": "106",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "211",
+  "libelle": "Récompenses obtenues lors de compétitions internationales",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "212",
+  "libelle": "Cercueils et urnes contenant des corps ou des cendres et objets les accompagnant",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "213",
+  "libelle": "Echantillons non destinés à la vente",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "214",
+  "libelle": "Formulaires d'importation temporaire ou de circulation internationale",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "215",
+  "libelle": "Affiches et publications de propagande pour la promotion du tourisme, des foires ou expositions",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "216",
+  "libelle": "Pièces de monnaie et billets de banque destinés à la BEAC",
+  "ancienCode": "106",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "220",
+  "libelle": "Importation des œuvres de solidarité nationale",
+  "ancienCode": "106",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "221",
+  "libelle": "Produits et objets destinés à la célébration des cultes",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "230",
+  "libelle": "Produits et matériels importés par l'Agence pour la sécurité de la navigation aérienne (ASECNA)",
+  "ancienCode": "108",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "231",
+  "libelle": "Matériels et documents importés par les entreprises de transport aérien étrangères",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "240",
+  "libelle": "Collections-livres-documents et publications",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "241",
+  "libelle": "Importations à caractère éducatif",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "242",
+  "libelle": "Importations à caractère scientifique",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "243",
+  "libelle": "Importations à caractère culturel",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "250",
+  "libelle": "Effets personnels des personnels étrangers",
+  "ancienCode": "110",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "251",
+  "libelle": "Effets personnels des nationaux",
+  "ancienCode": "110",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "252",
+  "libelle": "Effets et objets en cours d'usage provenant d'héritage",
+  "ancienCode": "110",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "253",
+  "libelle": "Trousseaux d'élèves",
+  "ancienCode": "110",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "254",
+  "libelle": "Trousseaux de mariage",
+  "ancienCode": "110",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "300",
+  "libelle": "Dons offerts au chef de l'Etat",
+  "ancienCode": "107",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "301",
+  "libelle": "Dons offerts au chef du Gouvernement",
+  "ancienCode": "107",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "310",
+  "libelle": "Dons offerts à l'Etat",
+  "ancienCode": "107",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "400",
+  "libelle": "Dons aux ONG pour l'Environnement",
+  "ancienCode": "107",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "401",
+  "libelle": "Dons aux ONG pour la Santé et l'hygiène",
+  "ancienCode": "107",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "402",
+  "libelle": "Dons aux ONG pour le Tourisme",
+  "ancienCode": "107",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "403",
+  "libelle": "Dons aux ONG pour l'éducation, la formation et la culture",
+  "ancienCode": "107",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "404",
+  "libelle": "Dons aux ONG pour le Sport",
+  "ancienCode": "107",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "405",
+  "libelle": "Dons aux ONG pour l'agriculture",
+  "ancienCode": "107",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "406",
+  "libelle": "Dons aux ONG pour le travail et Emploi",
+  "ancienCode": "107",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "600",
+  "libelle": "Matériel pour la recherche pétrolière",
+  "ancienCode": "103",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "601",
+  "libelle": "Recherche pétrolière: taux TVA 0%",
+  "ancienCode": "209",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "603",
+  "libelle": "Recherche pétrolière: exonération de la TCI et de la TVA",
+  "ancienCode": "210",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "604",
+  "libelle": "Recherche pétrolière: exonération de la TCI",
+  "ancienCode": "205",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "605",
+  "libelle": "Production pétrolière: importation au taux réduit de 5%",
+  "ancienCode": "202",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "610",
+  "libelle": "Matériel pour la recherche minière",
+  "ancienCode": "103",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "611",
+  "libelle": "Production minière: importation au taux réduit de 5%",
+  "ancienCode": "202",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "620",
+  "libelle": "Production minière: exportation du manganèse au taux réduit de 2%",
+  "ancienCode": "204",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "621",
+  "libelle": "Production minière: exportation de l'Or au taux de 1%",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "622",
+  "libelle": "Production minière: exportation de l'Or au taux de 2%",
+  "ancienCode": "204",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "623",
+  "libelle": "Production minière: exportation de l'Or au taux de 3%",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "624",
+  "libelle": "Production minière: exportation de l'Or au taux de 4%",
+  "ancienCode": "",
+  "baseLegale": "Acte 2/92"
+ },
+ {
+  "code": "625",
+  "libelle": "Production minière: exportation de l'Or au taux de 5%",
+  "ancienCode": "",
+  "baseLegale": ""
+ },
+ {
+  "code": "640",
+  "libelle": "Bois transformé: matériel, machines destinés à la transformation",
+  "ancienCode": "111",
+  "baseLegale": ""
+ },
+ {
+  "code": "650",
+  "libelle": "Agriculture: matériels, machines, biens et intrants agricoles",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°002/2013"
+ },
+ {
+  "code": "660",
+  "libelle": "Elevage: matériels, machines, biens et aliments pour l'élevage…",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°002/2013"
+ },
+ {
+  "code": "661",
+  "libelle": "Elevage: matériels, machines, biens et aliments pour l'élevage des volailles",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°002/2013"
+ },
+ {
+  "code": "662",
+  "libelle": "Elevage: matériels, machines, biens et aliments pour l'élevage du bétail",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°003/2013"
+ },
+ {
+  "code": "690",
+  "libelle": "Habitat social: matériel pour la construction des logements sociaux",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "6A0",
+  "libelle": "Tourisme: matériels, biens d'équipement destinés à la construction des hôtels",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "6C1",
+  "libelle": "Grands ensembles industriels: taux réduit de 5% pour les usines de mét…",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "6C2",
+  "libelle": "Grands ensembles industriels: taux réduit de 5% pour les usines de co…",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "6C4",
+  "libelle": "Grands ensembles industriels: taux réduit de 5% pour les usines de ciment",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "6E0",
+  "libelle": "ZERP import bois",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6E1",
+  "libelle": "ZERP import agro-industrie",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6E2",
+  "libelle": "ZERP import matériaux de construction",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6E3",
+  "libelle": "ZERP import immobilier",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6E4",
+  "libelle": "ZERP import recyclage",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6E5",
+  "libelle": "ZERP import hydrocarbures",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6E6",
+  "libelle": "ZERP import gestion",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6E7",
+  "libelle": "ZERP import automobiles",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6E8",
+  "libelle": "ZERP import chimie",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6E9",
+  "libelle": "Zerp import pétrochimie",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6EA",
+  "libelle": "Zerp import plastique, électronique",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6EB",
+  "libelle": "Zerp import construction",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6EC",
+  "libelle": "Zerp import papier",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6EG",
+  "libelle": "Zerp import communication",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6EH",
+  "libelle": "Zerp import électricité",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6F0",
+  "libelle": "Zerp export sociétés du groupe 1: TPZ = 0%",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6F1",
+  "libelle": "Zerp export sociétés du groupe 2: TPZ = 1%",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6F2",
+  "libelle": "Zerp export sociétés su groupe 3: TPZ = 2%",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6G0",
+  "libelle": "Importations du secteur féroviaire",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6J0",
+  "libelle": "Construction usines de ciment",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6J1",
+  "libelle": "Installation usines de ciment",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6K0",
+  "libelle": "GSEZ",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6K1",
+  "libelle": "GSEZ PORTS",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6K2",
+  "libelle": "GSEZ MINERAL PORT",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "6K3",
+  "libelle": "SOLIMAR",
+  "ancienCode": "111",
+  "baseLegale": "Accord de développement entre la République Gabonaise et GSEZ"
+ },
+ {
+  "code": "700",
+  "libelle": "Biens de premières nécéssité (vie chère)",
+  "ancienCode": "113",
+  "baseLegale": "Arrêté N°241/MEEDD/DG/DGCC"
+ },
+ {
+  "code": "701",
+  "libelle": "Ordinateurs fixes et portables bureautiques",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°14/2011"
+ },
+ {
+  "code": "710",
+  "libelle": "CNAMGS",
+  "ancienCode": "111",
+  "baseLegale": "Décret N°00510/PR/MTEPS"
+ },
+ {
+  "code": "711",
+  "libelle": "CNSS",
+  "ancienCode": "111",
+  "baseLegale": "Loi N°012/2014"
+ },
+ {
+  "code": "730",
+  "libelle": "Dons aux fédérations sportives de football",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "731",
+  "libelle": "Dons aux fédérations sportives d'athlétisme",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "732",
+  "libelle": "Dons aux fédérations sportives de volley ball",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "733",
+  "libelle": "Dons aux fédérations sportives de basket ball",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "734",
+  "libelle": "Dons aux fédérations sportives de Tennis",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "735",
+  "libelle": "Dons aux fédérations sportives de Karaté",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "736",
+  "libelle": "Dons aux fédérations sportives de taekwondo",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "737",
+  "libelle": "Dons aux fédérations sportives de Judo",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°11/2012"
+ },
+ {
+  "code": "740",
+  "libelle": "Dons aux Fondations pour l'Education",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°2/2000"
+ },
+ {
+  "code": "741",
+  "libelle": "Dons aux Fondations pour la Santé",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°2/2000"
+ },
+ {
+  "code": "742",
+  "libelle": "Dons aux Fondations pour affaires sociale",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°2/2000"
+ },
+ {
+  "code": "743",
+  "libelle": "Dons aux Fondations pour la Culture et arts",
+  "ancienCode": "107",
+  "baseLegale": "Loi N°2/2000"
+ },
+ {
+  "code": "750",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: dispositifs médicaux",
+  "ancienCode": "111",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "751",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: grossistes répartiteurs",
+  "ancienCode": "111",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "752",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: pharmacie-santé publique",
+  "ancienCode": "111",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "753",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: investigateurs cliniques",
+  "ancienCode": "111",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "754",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: société SHEC",
+  "ancienCode": "111",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "755",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: hôpitaux à but non lucratif",
+  "ancienCode": "111",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "756",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: personnels sur site",
+  "ancienCode": "113",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "757",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: agence de promotion",
+  "ancienCode": "113",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "758",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: représentants des laboratoires",
+  "ancienCode": "113",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "759",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: programme du MSPP",
+  "ancienCode": "113",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "75A",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: Partenaires internationaux",
+  "ancienCode": "113",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "75B",
+  "libelle": "Médicaments et matériels médicaux chirurgicaux: Compléments alimentaires",
+  "ancienCode": "113",
+  "baseLegale": "Arrêté N°20/MSPP"
+ },
+ {
+  "code": "800",
+  "libelle": "Matériels et produits importés par la Présidence de la République",
+  "ancienCode": "109",
+  "baseLegale": ""
+ },
+ {
+  "code": "900",
+  "libelle": "Marché1 (pk5-pk12)",
+  "ancienCode": "105",
+  "baseLegale": "Marché, contrat et convention"
+ }
+]

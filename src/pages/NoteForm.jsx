@@ -12,6 +12,7 @@ import { DatabaseContext } from '../context/DatabaseContext';
 import { UserContext } from '../context/UserContext';
 import { supabase, customFetch } from '../supabaseClient';
 import CustomPDFViewer from '../components/CustomPDFViewer';
+import CodeAdditionnelSelect from '../components/CodeAdditionnelSelect';
 import { distributeTotals } from '../utils/weightDistribution';
 import ReactMarkdown from 'react-markdown';
 import { createPortal } from 'react-dom';
@@ -1709,7 +1710,12 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                </div>
                <div>
                  <label style={labelStyle}>Code additionnel</label>
-                 <input style={inputStyle} name="codeAdditionnel" value={newArticle.codeAdditionnel ?? '000'} onChange={handleNewArticleChange} placeholder="Ex: 000" />
+                 <CodeAdditionnelSelect
+                   style={inputStyle}
+                   showLabel
+                   value={newArticle.codeAdditionnel ?? '000'}
+                   onChange={(code) => handleNewArticleChange({ target: { name: 'codeAdditionnel', value: code } })}
+                 />
                </div>
                
                {/* Calcul temps réel V.Stat */}
@@ -1825,7 +1831,7 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                         />
                       </td>
                       <td style={{ padding: '0.4rem 0.2rem', fontWeight: 600, color: 'var(--success)', fontSize: '0.85rem' }}>{formatNumberWithDots(getArticleVStat(art.valeur))}</td>
-                      <td style={{ padding: '0.4rem 0.2rem' }}><input value={art.codeAdditionnel ?? '000'} onChange={(e) => updateArticle(art.id, 'codeAdditionnel', e.target.value)} style={{...inputStyle, width: '45px', padding: '0.3rem', fontSize: '0.8rem'}} /></td>
+                      <td style={{ padding: '0.4rem 0.2rem' }}><CodeAdditionnelSelect compact value={art.codeAdditionnel ?? '000'} onChange={(code) => updateArticle(art.id, 'codeAdditionnel', code)} style={{...inputStyle, width: '62px', padding: '0.3rem', fontSize: '0.8rem'}} /></td>
                       <td style={{ padding: '0.4rem 0.2rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
                           <input type="number" value={String(art.tauxDD).replace('%','')} onChange={(e) => updateArticle(art.id, 'tauxDD', e.target.value)} style={{...inputStyle, width: '40px', padding: '0.3rem', fontSize: '0.8rem'}} />
