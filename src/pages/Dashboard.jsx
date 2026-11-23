@@ -6,6 +6,7 @@ import {
 import { UserContext } from '../context/UserContext';
 import { supabase, customFetch } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import AiCostsPanel from '../components/AiCostsPanel';
 
 const Modal = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
@@ -1148,6 +1149,8 @@ const Dashboard = () => {
               </button>
             </div>
           </form>
+          {/* Suivi des dépenses IA (données officielles Anthropic, via le service IA du serveur) */}
+          <AiCostsPanel />
         </div>
       )}
 
