@@ -163,6 +163,8 @@ const NoteForm = () => {
   const [aiResult, setAiResult] = useState({ code: '', libelle: '', explanation: '', taux: '', imageUrl: '', model: '' });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiImageZoomed, setAiImageZoomed] = useState(false);
+  const [aiImageLoading, setAiImageLoading] = useState(false);
+  const [aiImageMessage, setAiImageMessage] = useState('');
 
 
   // Nouveau state pour l'article en cours d'ajout
@@ -224,6 +226,48 @@ const NoteForm = () => {
       catch { explanation = raw.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\'); }
     }
     return { code: field('code'), libelle: field('libelle'), taux: field('taux'), explanation };
+  };
+
+  // URL d'origine d'une image servie par le proxy (/api/image-proxy?url=...)
+  const rawImageOf = (proxied) => {
+    if (!proxied) return '';
+    try { return new URL(proxied, window.location.origin).searchParams.get('url') || proxied; } catch { return proxied; }
+  };
+
+  // Bouton « Régénérer l'image » : nouvelle recherche d'image seule (sans relancer l'IA),
+  // en excluant les images déjà proposées pour cette recherche.
+  const regenerateAiImage = async () => {
+    const query = aiResult.imageQuery || aiQuery;
+    if (!query || !query.trim() || aiImageLoading) return;
+    setAiImageLoading(true);
+    setAiImageMessage('');
+    const apiBase = (typeof window !== 'undefined' && (window.__TAURI__ || window.location.origin.includes('localhost') || window.location.origin.includes('tauri'))) ? 'https://gnamatech.com' : '';
+    try {
+      const shown = aiResult.shownImages || [];
+      const r = await customFetch(`${apiBase}/api/image-search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, exclude: shown })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.imageUrl) {
+        setAiImageMessage(r.status === 404 ? 'Aucune autre image trouvée pour cette recherche.' : "Recherche d'image indisponible, réessayez.");
+        return;
+      }
+      const imageUrl = data.imageUrl.startsWith('http') ? data.imageUrl : `${apiBase}${data.imageUrl}`;
+      setAiResult(prev => ({
+        ...prev,
+        imageUrl,
+        imageSource: safeExternalUrl(data.imageSource),
+        imageTitle: typeof data.imageTitle === 'string' ? data.imageTitle : '',
+        imageQuery: query,
+        shownImages: [...(prev.shownImages || []), data.image || rawImageOf(imageUrl)].filter(Boolean),
+      }));
+    } catch {
+      setAiImageMessage("Recherche d'image indisponible, réessayez.");
+    } finally {
+      setAiImageLoading(false);
+    }
   };
 
   const handlePrintAiResult = () => {
@@ -1104,6 +1148,7 @@ const NoteForm = () => {
                   if (!aiQuery.trim()) return;
                   setAiLoading(true);
                   setAiResult({ code: '', libelle: '', explanation: '', taux: '', imageUrl: '' });
+                  setAiImageMessage('');
                   const prompt = `RÔLE
 Tu es un expert en nomenclature douanière avec plus de 20 ans d'expérience dans le classement tarifaire selon le Système Harmonisé (SH) de l'Organisation Mondiale des Douanes et le Tarif Extérieur Commun (TEC) de la CEMAC (application au Gabon). Tu maîtrises les Règles Générales Interprétatives (RGI), les Notes de Sections et de Chapitres, les Notes explicatives du SH et les avis de classement de l'OMD.
 
@@ -1222,7 +1267,7 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                     }
 
                     const { description, regles, sections } = splitClassificationRules(parsedExplanation);
-                    setAiResult({ code: parsedCode, libelle: parsedLibelle, taux: parsedTaux, explanation: description, regles, sections, imageUrl: foundImage, imageSource, imageTitle, model: usedModel });
+                    setAiResult({ code: parsedCode, libelle: parsedLibelle, taux: parsedTaux, explanation: description, regles, sections, imageUrl: foundImage, imageSource, imageTitle, imageQuery: aiQuery, shownImages: rawImageOf(foundImage) ? [rawImageOf(foundImage)] : [], model: usedModel });
                   })
                   .catch((err) => setAiResult({ code: '', libelle: '', explanation: `Erreur réseau : ${err.message}`, imageUrl: '', model: '' }))
                   .finally(() => setAiLoading(false));
@@ -1257,6 +1302,21 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                       </div>
                     </div>
                   )}
+                  {!aiResult.imageUrl && aiResult.code && (aiResult.imageQuery || aiQuery) && (
+                    <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={regenerateAiImage}
+                        disabled={aiImageLoading}
+                        title="Chercher une autre image pour ce produit (sans relancer l'analyse IA)"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', marginTop: '6px', width: '130px', boxSizing: 'border-box', padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-tertiary)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', cursor: aiImageLoading ? 'wait' : 'pointer', opacity: aiImageLoading ? 0.7 : 1 }}
+                      >
+                        <RefreshCw size={13} style={{ flexShrink: 0, animation: aiImageLoading ? 'spin 1s linear infinite' : 'none' }} />
+                        {aiImageLoading ? 'Recherche…' : 'Chercher une image'}
+                      </button>
+                      {aiImageMessage && <div style={{ width: '130px', marginTop: '4px', fontSize: '0.68rem', color: '#d97706', lineHeight: 1.3 }}>{aiImageMessage}</div>}
+                    </div>
+                  )}
                   {aiResult.imageUrl && (
                     <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
                       <div
@@ -1268,7 +1328,8 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                           src={aiResult.imageUrl}
                           alt={aiQuery || "Produit"}
                           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                          onError={(e) => { if (e.currentTarget?.parentElement?.parentElement) e.currentTarget.parentElement.parentElement.style.display = 'none'; }}
+                          onLoad={(e) => { if (e.currentTarget?.parentElement) e.currentTarget.parentElement.style.display = ''; }}
+                          onError={(e) => { if (e.currentTarget?.parentElement) e.currentTarget.parentElement.style.display = 'none'; }}
                         />
                         <div style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', padding: '2px 5px', fontSize: '0.65rem', color: '#fff', pointerEvents: 'none' }}>🔍 Agrandir</div>
                       </div>
@@ -1285,6 +1346,17 @@ Réponds UNIQUEMENT avec un objet JSON valide contenant exactement ces 4 clés :
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{urlHostname(aiResult.imageSource)}</span>
                         </a>
                       )}
+                      <button
+                        type="button"
+                        onClick={regenerateAiImage}
+                        disabled={aiImageLoading}
+                        title="Chercher une autre image pour ce produit (sans relancer l'analyse IA)"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', marginTop: '6px', width: '130px', boxSizing: 'border-box', padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-tertiary)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', cursor: aiImageLoading ? 'wait' : 'pointer', opacity: aiImageLoading ? 0.7 : 1 }}
+                      >
+                        <RefreshCw size={13} style={{ flexShrink: 0, animation: aiImageLoading ? 'spin 1s linear infinite' : 'none' }} />
+                        {aiImageLoading ? 'Recherche…' : "Régénérer l'image"}
+                      </button>
+                      {aiImageMessage && <div style={{ width: '130px', marginTop: '4px', fontSize: '0.68rem', color: '#d97706', lineHeight: 1.3 }}>{aiImageMessage}</div>}
                       {aiImageZoomed && (
                         <div
                           onClick={() => setAiImageZoomed(false)}
